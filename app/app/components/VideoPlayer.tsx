@@ -7,11 +7,7 @@ import {
   Poster, 
   type MediaPlayerInstance,
 } from '@vidstack/react';
-import { 
-  DefaultVideoLayout, 
-  defaultLayoutIcons 
-} from '@vidstack/react/player/layouts/default';
-import { Volume2, VolumeX, Play, Pause, Maximize } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
 
 // Import Vidstack styles
 import '@vidstack/react/player/styles/base.css';
