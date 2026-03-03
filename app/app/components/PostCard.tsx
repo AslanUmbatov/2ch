@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Download, MessageSquare, Eye, FileText } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
+import VideoPlayer from './VideoPlayer';
 
 interface PostCardProps {
   thread: Thread;
@@ -68,13 +69,13 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false }: P
                 className={`relative w-full ${files.length === 3 && idx === 0 ? 'col-span-2' : ''}`}
             >
               {isVideo(file) ? (
-                <video
-                  src={getMediaUrl(file.path)}
-                  controls
-                  className={`w-full h-full object-cover bg-gray-900 ${files.length > 1 ? 'aspect-square' : 'max-h-[600px] object-contain'}`}
-                  poster={getMediaUrl(file.thumbnail)}
-                  preload="metadata"
-                />
+                <div className={`w-full ${files.length > 1 ? 'aspect-square' : 'aspect-video max-h-[600px]'}`}>
+                   <VideoPlayer
+                      src={getMediaUrl(file.path)}
+                      poster={getMediaUrl(file.thumbnail)}
+                      className="w-full h-full"
+                   />
+                </div>
               ) : (
                 <img
                   src={getMediaUrl(file.path)}
@@ -102,20 +103,32 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false }: P
         />
       </div>
 
-      {/* Footer Actions */}
+      {/* Footer */}
       {!hideFooter && (
-        <div className="px-4 mt-4 flex items-center justify-between text-gray-500">
-          <div className="flex items-center gap-6">
-            <Link href={`/thread/${thread.num}`} className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer">
-              <MessageSquare size={18} />
-              <span className="text-xs font-medium">{thread.posts_count}</span>
+        <div className="mt-4 px-4 flex justify-between items-center text-gray-500 text-xs">
+          <div className="flex gap-4">
+            <Link 
+                href={`/thread/${thread.num}`}
+                className="flex items-center gap-1.5 hover:text-white transition-colors p-2 -ml-2 rounded-full hover:bg-gray-900"
+            >
+              <MessageSquare size={16} />
+              <span>{thread.posts_count} Комментариев</span>
             </Link>
-            <div className="flex items-center gap-1.5">
-              <Eye size={18} />
-              <span className="text-xs font-medium">{thread.views}</span>
-            </div>
           </div>
-          {/* ... */}
+          
+          <div className="flex gap-4">
+             {files.length > 0 && (
+                <a 
+                    href={getMediaUrl(files[0].path)} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 hover:text-white transition-colors"
+                    title="Скачать первое вложение"
+                >
+                    <Download size={16} />
+                </a>
+             )}
+          </div>
         </div>
       )}
     </motion.div>

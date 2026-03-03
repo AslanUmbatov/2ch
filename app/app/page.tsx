@@ -6,6 +6,7 @@ import CatalogCard from './components/CatalogCard';
 import { Thread, File } from './types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, RefreshCw, LayoutGrid, List } from 'lucide-react';
+import VideoPlayer from './components/VideoPlayer';
 
 export default function Home() {
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -44,17 +45,6 @@ export default function Home() {
   useEffect(() => {
     if (threads.length > 0) {
       const itemsPerPage = viewMode === 'catalog' ? 20 : 10;
-      // If we switch modes, we might want to adjust visible count to fill screen properly
-      // But keeping simple logic: show page * itemsPerPage
-      // Actually page logic depends on itemsPerPage. 
-      // If we switch to catalog, we fit more items.
-      // Let's just use a fixed number of loaded items regardless of mode for simplicity, 
-      // OR adjust based on mode.
-      
-      // Let's keep existing "page" concept where page 1 has N items.
-      // But wait, if I have 10 items (Feed), switching to Catalog (grid) 10 items is just 2.5 rows. 
-      // That's fine.
-      
       const count = page * 10; 
       setVisibleThreads(threads.slice(0, count));
     }
@@ -149,24 +139,26 @@ export default function Home() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="relative max-w-full max-h-full"
+            className="relative w-full h-full flex items-center justify-center p-4"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close button */}
             <button 
-                className="absolute -top-12 right-0 text-white/70 hover:text-white p-2 z-50"
+                className="absolute top-4 right-4 text-white/70 hover:text-white p-2 z-50 bg-black/50 rounded-full backdrop-blur-md"
                 onClick={() => setSelectedMedia(null)}
             >
-                Закрыть [Esc]
+                <X size={24} />
             </button>
 
             {selectedMedia.path.endsWith('.webm') || selectedMedia.path.endsWith('.mp4') ? (
-               <video
-                src={`https://2ch.org${selectedMedia.path}`}
-                controls
-                autoPlay
-                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl shadow-orange-500/20"
-              />
+               <div className="w-full h-full max-w-5xl max-h-[90vh]">
+                   <VideoPlayer
+                    src={`https://2ch.org${selectedMedia.path}`}
+                    className="w-full h-full rounded-lg shadow-2xl shadow-orange-500/20"
+                    autoplay={true}
+                    loop={true}
+                  />
+               </div>
             ) : (
               <img
                 src={`https://2ch.org${selectedMedia.path}`}
