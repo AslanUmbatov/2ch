@@ -6,10 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "android:sync": "next build && npx cap sync"
   },
   "dependencies": {
+    "@capacitor-community/media": "^9.0.2",
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/status-bar": "^8.0.1",
+    "@capacitor/toast": "^8.0.1",
     "@vidstack/react": "^1.12.13",
+    "body-scroll-lock": "^4.0.0-beta.0",
     "framer-motion": "^12.34.5",
     "lucide-react": "^0.576.0",
     "next": "16.1.6",
@@ -18,7 +28,9 @@
     "vidstack": "^1.12.13"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@tailwindcss/postcss": "^4",
+    "@types/body-scroll-lock": "^3.1.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

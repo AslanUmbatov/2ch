@@ -25,7 +25,7 @@ export default function CatalogCard({ thread }: CatalogCardProps) {
   const simpleStrip = (html: string) => html.replace(/<[^>]*>?/gm, '');
 
   return (
-    <Link href={`/thread/${thread.num}`} className="block h-full">
+    <Link href={`/thread?id=${thread.num}`} className="block h-full">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         whileInView={{ opacity: 1, scale: 1 }}

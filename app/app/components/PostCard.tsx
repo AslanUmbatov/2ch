@@ -2,19 +2,74 @@
 
 import { Thread, File } from '../types';
 import { motion } from 'framer-motion';
-import { Download, MessageSquare, Eye, FileText } from 'lucide-react';
-import { useState } from 'react';
+import { Download, MessageSquare, Play } from 'lucide-react';
 import Link from 'next/link';
-import VideoPlayer from './VideoPlayer';
+import { useMedia } from '../context/MediaContext';
 
 interface PostCardProps {
   thread: Thread;
-  onMediaClick: (file: File) => void;
+  onMediaClick?: (file: File) => void; // Made optional as we handle it internally now
   hideFooter?: boolean;
 }
 
+const getMediaUrl = (path: string) => `https://2ch.life${path}`;
+const getThumbnailUrl = (file: File) => `https://2ch.life${file.thumbnail}`;
+
+// Component for video thumbnail that opens fullscreen player
+const VideoThumbnail = ({ file, className, layoutId }: { file: File, className: string, layoutId: string }) => {
+  const { openFullscreen, activeLayoutId } = useMedia();
+
+  return (
+    <motion.div 
+      layoutId={layoutId}
+      className={`relative cursor-pointer group w-full h-full overflow-hidden bg-gray-900 ${className}`}
+      style={{ opacity: activeLayoutId === layoutId ? 0 : 1 }}
+      onClick={(e) => {
+        e.stopPropagation();
+        openFullscreen({
+            type: 'video',
+            src: getMediaUrl(file.path),
+            currentTime: 0,
+            poster: getThumbnailUrl(file),
+            layoutId: layoutId
+        });
+      }}
+    >
+      <img
+        src={getThumbnailUrl(file)}
+        alt={file.displayname}
+        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+        loading="lazy"
+        onError={(e) => {
+          // Fallback to full image if thumbnail fails
+           e.currentTarget.src = getMediaUrl(file.path);
+        }}
+      />
+      {/* Play Button Overlay */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="bg-black/40 backdrop-blur-sm p-4 rounded-full border border-white/10 shadow-xl group-hover:scale-110 group-hover:bg-cyan-500/80 transition-all duration-300">
+           <Play size={32} fill="white" className="text-white ml-1" />
+        </div>
+      </div>
+      
+      {/* Duration Badge if available */}
+      {file.duration && (
+        <div className="absolute bottom-2 right-2 bg-black/70 px-1.5 py-0.5 rounded text-[10px] text-white font-medium font-mono backdrop-blur-sm">
+          {file.duration}
+        </div>
+      )}
+      
+      {/* Type Badge */}
+      <div className="absolute top-2 left-2 bg-black/60 px-1.5 py-0.5 rounded text-[10px] text-white/80 uppercase font-bold backdrop-blur-sm">
+        {file.path.split('.').pop()}
+      </div>
+    </motion.div>
+  );
+};
+
 export default function PostCard({ thread, onMediaClick, hideFooter = false }: PostCardProps) {
   const files = thread.files || [];
+  const { openFullscreen, activeLayoutId } = useMedia();
   
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString('ru-RU', {
@@ -25,8 +80,6 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false }: P
     });
   };
 
-  const getMediaUrl = (path: string) => `https://2ch.org${path}`;
-
   const isVideo = (file: File) => {
     const ext = file.path.split('.').pop()?.toLowerCase();
     return ext === 'webm' || ext === 'mp4';
@@ -34,13 +87,19 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false }: P
 
   const getGridClass = (count: number) => {
     if (count === 1) return 'grid-cols-1';
-    if (count === 2) return 'grid-cols-2';
-    if (count === 3) return 'grid-cols-2'; // 2 top, 1 bottom stretched or similar. Let's stick to simple grid.
-    // Actually simple grid-cols-2 is often fine for 2-4 images.
-    // For 3 images, maybe first one full width? Or just grid-cols-2 and last one takes full?
-    // Let's use auto-fit or specific classes.
     if (count >= 2) return 'grid-cols-2';
     return 'grid-cols-1';
+  };
+
+    const handleImageClick = (file: File) => {
+      openFullscreen({
+          type: 'image',
+          src: getMediaUrl(file.path),
+          alt: file.displayname,
+          layoutId: `media-${thread.num}-${file.path}`
+      });
+      // Call prop if provided (for backward compatibility or extra side effects)
+      if (onMediaClick) onMediaClick(file);
   };
 
   return (
@@ -70,19 +129,25 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false }: P
             >
               {isVideo(file) ? (
                 <div className={`w-full ${files.length > 1 ? 'aspect-square' : 'aspect-video max-h-[600px]'}`}>
-                   <VideoPlayer
-                      src={getMediaUrl(file.path)}
-                      poster={getMediaUrl(file.thumbnail)}
+                   <VideoThumbnail
+                      file={file}
                       className="w-full h-full"
+                      layoutId={`media-${thread.num}-${file.path}`}
                    />
                 </div>
               ) : (
-                <img
+                <motion.img
+                  layoutId={`media-${thread.num}-${file.path}`}
                   src={getMediaUrl(file.path)}
                   alt={file.displayname}
                   className={`w-full h-full bg-gray-900 cursor-zoom-in ${files.length > 1 ? 'object-cover aspect-square' : 'object-contain max-h-[600px]'}`}
-                  onClick={() => onMediaClick(file)}
+                  onClick={() => handleImageClick(file)}
                   loading="lazy"
+                  style={{ opacity: activeLayoutId === `media-${thread.num}-${file.path}` ? 0 : 1 }}
+                  onError={(e) => {
+                     // Try thumbnail if full fails (unlikely but possible)
+                     e.currentTarget.src = getThumbnailUrl(file);
+                  }}
                 />
               )}
             </div>
@@ -108,7 +173,7 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false }: P
         <div className="mt-4 px-4 flex justify-between items-center text-gray-500 text-xs">
           <div className="flex gap-4">
             <Link 
-                href={`/thread/${thread.num}`}
+                href={`/thread?id=${thread.num}`}
                 className="flex items-center gap-1.5 hover:text-white transition-colors p-2 -ml-2 rounded-full hover:bg-gray-900"
             >
               <MessageSquare size={16} />

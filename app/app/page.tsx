@@ -4,36 +4,52 @@ import { useState, useEffect, useRef } from 'react';
 import PostCard from './components/PostCard';
 import CatalogCard from './components/CatalogCard';
 import { Thread, File } from './types';
+import { getThreads } from './services/api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, RefreshCw, LayoutGrid, List } from 'lucide-react';
-import VideoPlayer from './components/VideoPlayer';
+import { Download, RefreshCw, LayoutGrid, List, ArrowDownWideNarrow, ArrowUpNarrowWide } from 'lucide-react';
+import { useScrollDirection } from './hooks/useScrollDirection';
+import { useMedia } from './context/MediaContext';
 
 export default function Home() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [visibleThreads, setVisibleThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
   const [viewMode, setViewMode] = useState<'feed' | 'catalog'>('feed');
+  const [sortMode, setSortMode] = useState<'default' | 'date_desc'>('default');
   const observerTarget = useRef<HTMLDivElement>(null);
+  const scrollDirection = useScrollDirection();
+  const { fullscreenItem } = useMedia();
 
   const fetchThreads = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch('/api/threads');
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
-      if (data.threads) {
-        setThreads(data.threads);
+      const data = await getThreads();
+      if (data && data.length > 0) {
+        setThreads(data);
         // For catalog mode, we might want to load more items initially or stick to same pagination
         const itemsPerPage = viewMode === 'catalog' ? 20 : 10;
-        setVisibleThreads(data.threads.slice(0, itemsPerPage));
+        setVisibleThreads(sortThreads(data, sortMode).slice(0, itemsPerPage));
         setPage(1);
+      } else {
+        setError('Не удалось загрузить треды. Проверьте соединение.');
       }
     } catch (err) {
       console.error(err);
+      setError('Ошибка при загрузке данных.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sortThreads = (threads: Thread[], mode: 'default' | 'date_desc') => {
+    if (mode === 'default') {
+      return [...threads]; // Original order from API
+    } else {
+      // Sort by timestamp (newest first)
+      return [...threads].sort((a, b) => b.timestamp - a.timestamp);
     }
   };
 
@@ -41,14 +57,15 @@ export default function Home() {
     fetchThreads();
   }, []);
 
-  // Update visible threads when page changes or viewMode changes
+  // Update visible threads when page changes, viewMode changes, or sortMode changes
   useEffect(() => {
     if (threads.length > 0) {
       const itemsPerPage = viewMode === 'catalog' ? 20 : 10;
       const count = page * 10; 
-      setVisibleThreads(threads.slice(0, count));
+      const sorted = sortThreads(threads, sortMode);
+      setVisibleThreads(sorted.slice(0, count));
     }
-  }, [page, threads, viewMode]);
+  }, [page, threads, viewMode, sortMode]);
 
   // Infinite scroll implementation
   useEffect(() => {
@@ -71,7 +88,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-black text-white flex justify-center font-sans selection:bg-orange-500 selection:text-white">
       <div className={`w-full ${viewMode === 'catalog' ? 'max-w-5xl' : 'max-w-[600px]'} border-x border-gray-900 min-h-screen relative transition-all duration-300`}>
-         <header className="sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50">
+         <header className={`sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50 transition-transform duration-300 ease-in-out ${scrollDirection === 'down' || fullscreenItem ? '-translate-y-full' : 'translate-y-0'}`}>
             <h1 className="text-xl font-bold tracking-tighter text-white flex items-center gap-2">
               <span className="text-orange-500">/b/</span> {viewMode === 'feed' ? 'Feed' : 'Catalog'}
             </h1>
@@ -82,6 +99,13 @@ export default function Home() {
                   title={viewMode === 'feed' ? "Каталог" : "Лента"}
                 >
                   {viewMode === 'feed' ? <LayoutGrid size={20} /> : <List size={20} />}
+                </button>
+                <button
+                  onClick={() => setSortMode(prev => prev === 'default' ? 'date_desc' : 'default')}
+                  className="p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200"
+                  title={sortMode === 'default' ? "Сортировать по дате" : "Стандартная сортировка"}
+                >
+                  {sortMode === 'default' ? <ArrowDownWideNarrow size={20} /> : <ArrowUpNarrowWide size={20} />}
                 </button>
                 <button 
                   onClick={fetchThreads}
@@ -94,13 +118,24 @@ export default function Home() {
          </header>
 
          <div className={`pb-20 ${viewMode === 'catalog' ? 'p-2' : ''}`}>
-            {viewMode === 'feed' ? (
+            {error && (
+              <div className="flex flex-col items-center justify-center py-20 text-center text-gray-400">
+                <p className="mb-4 text-lg">{error}</p>
+                <button 
+                  onClick={fetchThreads}
+                  className="px-6 py-2 bg-orange-600 text-white rounded-full hover:bg-orange-700 transition-colors"
+                >
+                  Попробовать снова
+                </button>
+              </div>
+            )}
+
+            {!error && viewMode === 'feed' ? (
                 <div className="flex flex-col">
                     {visibleThreads.map(thread => (
                       <PostCard 
                         key={thread.num} 
                         thread={thread} 
-                        onMediaClick={setSelectedMedia} 
                       />
                     ))}
                 </div>
@@ -128,51 +163,6 @@ export default function Home() {
             </div>
          </div>
       </div>
-
-       {/* Fullscreen Media Viewer */}
-       {selectedMedia && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm"
-          onClick={() => setSelectedMedia(null)}
-        >
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="relative w-full h-full flex items-center justify-center p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close button */}
-            <button 
-                className="absolute top-4 right-4 text-white/70 hover:text-white p-2 z-50 bg-black/50 rounded-full backdrop-blur-md"
-                onClick={() => setSelectedMedia(null)}
-            >
-                <X size={24} />
-            </button>
-
-            {selectedMedia.path.endsWith('.webm') || selectedMedia.path.endsWith('.mp4') ? (
-               <div className="w-full h-full max-w-5xl max-h-[90vh]">
-                   <VideoPlayer
-                    src={`https://2ch.org${selectedMedia.path}`}
-                    className="w-full h-full rounded-lg shadow-2xl shadow-orange-500/20"
-                    autoplay={true}
-                    loop={true}
-                  />
-               </div>
-            ) : (
-              <img
-                src={`https://2ch.org${selectedMedia.path}`}
-                alt={selectedMedia.displayname}
-                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl shadow-orange-500/20"
-              />
-            )}
-            
-            <div className="absolute bottom-4 left-0 right-0 text-center text-gray-400 text-sm pointer-events-none">
-                {selectedMedia.displayname}
-            </div>
-          </motion.div>
-        </div>
-      )}
     </main>
   );
 }
