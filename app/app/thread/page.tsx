@@ -53,8 +53,8 @@ function ThreadContent() {
   });
 
   return (
-    <div className="w-full max-w-[600px] border-x border-gray-900 min-h-screen relative">
-         <header className={`sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50 transition-transform duration-300 ease-in-out ${scrollDirection === 'down' || fullscreenItem ? '-translate-y-full' : 'translate-y-0'}`}>
+    <div className="w-full max-w-[600px] border-x border-gray-900 min-h-screen relative pt-16">
+         <header className={`fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[600px] z-30 bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50 transition-transform duration-300 ease-in-out ${scrollDirection === 'down' || fullscreenItem ? '-translate-y-full' : 'translate-y-0'}`}>
             <button 
               onClick={() => router.back()}
               className="p-2 hover:bg-gray-800 rounded-full transition-colors"

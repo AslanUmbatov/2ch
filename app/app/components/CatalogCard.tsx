@@ -1,15 +1,16 @@
 'use client';
 
 import { Thread } from '../types';
-import Link from 'next/link';
 import { MessageSquare, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useFeed } from '../context/FeedContext';
 
 interface CatalogCardProps {
   thread: Thread;
 }
 
 export default function CatalogCard({ thread }: CatalogCardProps) {
+  const { openThread } = useFeed();
   const file = thread.files && thread.files.length > 0 ? thread.files[0] : null;
   const getMediaUrl = (path: string) => `https://2ch.org${path}`;
 
@@ -25,8 +26,8 @@ export default function CatalogCard({ thread }: CatalogCardProps) {
   const simpleStrip = (html: string) => html.replace(/<[^>]*>?/gm, '');
 
   return (
-    <Link href={`/thread?id=${thread.num}`} className="block h-full">
-      <motion.div 
+    <div onClick={() => openThread(thread.num.toString())} className="block h-full cursor-pointer">
+      <motion.div  
         initial={{ opacity: 0, scale: 0.95 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
@@ -73,6 +74,6 @@ export default function CatalogCard({ thread }: CatalogCardProps) {
             </p>
         </div>
       </motion.div>
-    </Link>
+    </div>
   );
 }

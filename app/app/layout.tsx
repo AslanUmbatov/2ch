@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { MediaProvider } from "./context/MediaContext";
+import { FeedProvider } from "./context/FeedContext";
 import BackButtonHandler from "./components/BackButtonHandler";
 import StatusBarHandler from "./components/StatusBarHandler";
 
@@ -38,11 +39,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <MediaProvider>
-          <BackButtonHandler />
-          <StatusBarHandler />
-          {children}
-        </MediaProvider>
+        <FeedProvider>
+          <MediaProvider>
+            <BackButtonHandler />
+            <StatusBarHandler />
+            {children}
+          </MediaProvider>
+        </FeedProvider>
       </body>
     </html>
   );

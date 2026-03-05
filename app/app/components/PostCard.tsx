@@ -3,8 +3,8 @@
 import { Thread, File } from '../types';
 import { motion } from 'framer-motion';
 import { Download, MessageSquare, Play } from 'lucide-react';
-import Link from 'next/link';
 import { useMedia } from '../context/MediaContext';
+import { useFeed } from '../context/FeedContext';
 
 interface PostCardProps {
   thread: Thread;
@@ -70,6 +70,7 @@ const VideoThumbnail = ({ file, className, layoutId }: { file: File, className: 
 export default function PostCard({ thread, onMediaClick, hideFooter = false }: PostCardProps) {
   const files = thread.files || [];
   const { openFullscreen, activeLayoutId } = useMedia();
+  const { openThread } = useFeed();
   
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString('ru-RU', {
@@ -172,13 +173,13 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false }: P
       {!hideFooter && (
         <div className="mt-4 px-4 flex justify-between items-center text-gray-500 text-xs">
           <div className="flex gap-4">
-            <Link 
-                href={`/thread?id=${thread.num}`}
+            <button 
+                onClick={() => openThread(thread.num.toString())}
                 className="flex items-center gap-1.5 hover:text-white transition-colors p-2 -ml-2 rounded-full hover:bg-gray-900"
             >
               <MessageSquare size={16} />
               <span>{thread.posts_count} Комментариев</span>
-            </Link>
+            </button>
           </div>
           
           <div className="flex gap-4">

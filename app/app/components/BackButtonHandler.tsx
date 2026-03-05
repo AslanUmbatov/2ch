@@ -4,18 +4,20 @@ import { useEffect, useRef } from 'react';
 import { App } from '@capacitor/app';
 import { useRouter, usePathname } from 'next/navigation';
 import { useMedia } from '../context/MediaContext';
+import { useFeed } from '../context/FeedContext';
 
 export default function BackButtonHandler() {
   const router = useRouter();
   const pathname = usePathname();
   const { fullscreenItem, closeFullscreen } = useMedia();
+  const { activeThreadId, closeThread } = useFeed();
 
   // Use refs to keep latest state accessible in the event listener without re-binding
-  const stateRef = useRef({ fullscreenItem, closeFullscreen, pathname, router });
+  const stateRef = useRef({ fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread });
 
   useEffect(() => {
-    stateRef.current = { fullscreenItem, closeFullscreen, pathname, router };
-  }, [fullscreenItem, closeFullscreen, pathname, router]);
+    stateRef.current = { fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread };
+  }, [fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread]);
 
   useEffect(() => {
     let listenerHandle: any;
@@ -24,11 +26,14 @@ export default function BackButtonHandler() {
     const setupListener = async () => {
       try {
         const handle = await App.addListener('backButton', ({ canGoBack }) => {
-            const { fullscreenItem, closeFullscreen, pathname, router } = stateRef.current;
+            const { fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread } = stateRef.current;
             
             if (fullscreenItem) {
                 // If modal is open (video or image), close it and consume the event
                 closeFullscreen();
+            } else if (activeThreadId) {
+                // If thread overlay is open, close it
+                closeThread();
             } else {
                 if (pathname === '/') {
                     // If on home page, minimize app (standard Android behavior)

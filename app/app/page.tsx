@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Download, RefreshCw, LayoutGrid, List, ArrowDownWideNarrow, ArrowUpNarrowWide } from 'lucide-react';
 import { useScrollDirection } from './hooks/useScrollDirection';
 import { useMedia } from './context/MediaContext';
+import { useFeed } from './context/FeedContext';
+import ThreadView from './components/ThreadView';
 
 export default function Home() {
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -21,6 +23,7 @@ export default function Home() {
   const observerTarget = useRef<HTMLDivElement>(null);
   const scrollDirection = useScrollDirection();
   const { fullscreenItem } = useMedia();
+  const { activeThreadId, closeThread } = useFeed();
 
   const fetchThreads = async () => {
     setLoading(true);
@@ -87,8 +90,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-white flex justify-center font-sans selection:bg-orange-500 selection:text-white">
-      <div className={`w-full ${viewMode === 'catalog' ? 'max-w-5xl' : 'max-w-[600px]'} border-x border-gray-900 min-h-screen relative transition-all duration-300`}>
-         <header className={`sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50 transition-transform duration-300 ease-in-out ${scrollDirection === 'down' || fullscreenItem ? '-translate-y-full' : 'translate-y-0'}`}>
+      <div className={`w-full ${viewMode === 'catalog' ? 'max-w-5xl' : 'max-w-[600px]'} border-x border-gray-900 min-h-screen relative transition-all duration-300 pt-16`}>
+         <header className={`fixed top-0 left-1/2 -translate-x-1/2 w-full ${viewMode === 'catalog' ? 'max-w-5xl' : 'max-w-[600px]'} z-30 bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50 transition-transform duration-300 ease-in-out ${scrollDirection === 'down' || fullscreenItem ? '-translate-y-full' : 'translate-y-0'}`}>
             <h1 className="text-xl font-bold tracking-tighter text-white flex items-center gap-2">
               <span className="text-orange-500">/b/</span> {viewMode === 'feed' ? 'Feed' : 'Catalog'}
             </h1>
@@ -163,6 +166,15 @@ export default function Home() {
             </div>
          </div>
       </div>
+      
+      <AnimatePresence>
+        {activeThreadId && (
+          <ThreadView 
+            threadId={activeThreadId} 
+            onClose={closeThread} 
+          />
+        )}
+      </AnimatePresence>
     </main>
   );
 }
