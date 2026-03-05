@@ -74,10 +74,10 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-40 bg-black flex justify-center"
+      className="fixed inset-0 z-40 bg-black/90 backdrop-blur-sm flex justify-center"
       style={{ touchAction: 'pan-y' }}
     >
-       <div className="w-full max-w-[600px] border-x border-gray-900 h-full relative flex flex-col bg-black text-white font-sans">
+       <div className="w-full max-w-[600px] border-x border-gray-900 h-full relative flex flex-col bg-transparent text-white font-sans">
           <header className={`absolute top-0 left-0 w-full z-50 bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50 transition-transform duration-300 ease-in-out ${scrollDirection === 'down' && !fullscreenItem ? '-translate-y-full' : 'translate-y-0'}`}>
             <button 
               onClick={onClose}
@@ -106,14 +106,6 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
               </div>
             ) : (
               <div className="pb-20">
-                {thread && (
-                  <div className="border-b border-gray-800">
-                     <PostCard 
-                       thread={mapPostToThread(thread)} 
-                       hideFooter={true}
-                     />
-                   </div>
-                 )}
                  {posts.map((post) => (
                    <div key={post.num} className="border-b border-gray-800">
                      <PostCard 

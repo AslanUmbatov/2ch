@@ -2,7 +2,7 @@
 
 import { Thread, File } from '../types';
 import { motion } from 'framer-motion';
-import { Download, MessageSquare, Play } from 'lucide-react';
+import { MessageSquare, Play } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
 import { useFeed } from '../context/FeedContext';
 
@@ -171,30 +171,14 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false }: P
 
       {/* Footer */}
       {!hideFooter && (
-        <div className="mt-4 px-4 flex justify-between items-center text-gray-500 text-xs">
-          <div className="flex gap-4">
+        <div className="mt-4 px-4 flex justify-end items-center text-gray-500 text-xs">
             <button 
                 onClick={() => openThread(thread.num.toString())}
-                className="flex items-center gap-1.5 hover:text-white transition-colors p-2 -ml-2 rounded-full hover:bg-gray-900"
+                className="flex items-center gap-1.5 hover:text-white transition-colors p-2 rounded-full hover:bg-gray-900"
             >
               <MessageSquare size={16} />
               <span>{thread.posts_count} Комментариев</span>
             </button>
-          </div>
-          
-          <div className="flex gap-4">
-             {files.length > 0 && (
-                <a 
-                    href={getMediaUrl(files[0].path)} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 hover:text-white transition-colors"
-                    title="Скачать первое вложение"
-                >
-                    <Download size={16} />
-                </a>
-             )}
-          </div>
         </div>
       )}
     </motion.div>

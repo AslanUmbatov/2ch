@@ -90,7 +90,14 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-white flex justify-center font-sans selection:bg-orange-500 selection:text-white">
-      <div className={`w-full ${viewMode === 'catalog' ? 'max-w-5xl' : 'max-w-[600px]'} border-x border-gray-900 min-h-screen relative transition-all duration-300 pt-16`}>
+      <motion.div 
+        animate={{ 
+          filter: activeThreadId ? 'blur(10px) brightness(0.7)' : 'blur(0px) brightness(1)',
+          scale: activeThreadId ? 0.95 : 1
+        }}
+        transition={{ duration: 0.3 }}
+        className={`w-full ${viewMode === 'catalog' ? 'max-w-5xl' : 'max-w-[600px]'} border-x border-gray-900 min-h-screen relative pt-16`}
+      >
          <header className={`fixed top-0 left-1/2 -translate-x-1/2 w-full ${viewMode === 'catalog' ? 'max-w-5xl' : 'max-w-[600px]'} z-30 bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50 transition-transform duration-300 ease-in-out ${scrollDirection === 'down' || fullscreenItem ? '-translate-y-full' : 'translate-y-0'}`}>
             <h1 className="text-xl font-bold tracking-tighter text-white flex items-center gap-2">
               <span className="text-orange-500">/b/</span> {viewMode === 'feed' ? 'Feed' : 'Catalog'}
@@ -165,7 +172,7 @@ export default function Home() {
                )}
             </div>
          </div>
-      </div>
+      </motion.div>
       
       <AnimatePresence>
         {activeThreadId && (
