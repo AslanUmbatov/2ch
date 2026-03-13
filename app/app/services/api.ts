@@ -270,6 +270,7 @@ export async function getThread(id: string): Promise<{ thread: Thread, posts: an
 export interface FourChanBoard {
   board: string;
   title: string;
+  meta_description?: string;
   ws_board?: number;
   per_page?: number;
   pages?: number;

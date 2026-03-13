@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import PostCard from './components/PostCard';
 import CatalogCard from './components/CatalogCard';
 import { Thread } from './types';
 import { get4ChanBoards, get4ChanCatalog, getThreads, FourChanBoard } from './services/api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, LayoutGrid, List, ArrowDownWideNarrow, ArrowUpNarrowWide } from 'lucide-react';
+import { RefreshCw, LayoutGrid, List, ArrowDownWideNarrow, ArrowUpNarrowWide, Star } from 'lucide-react';
 import { useScrollDirection } from './hooks/useScrollDirection';
 import { useMedia } from './context/MediaContext';
 import { useFeed } from './context/FeedContext';
@@ -17,6 +17,27 @@ export default function Home() {
   const [boards, setBoards] = useState<FourChanBoard[]>([]);
   const [activeBoard, setActiveBoard] = useState('b');
   const [isBoardPickerOpen, setIsBoardPickerOpen] = useState(false);
+  const [favoriteBoards, setFavoriteBoards] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('favoriteBoards4chan');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [recentBoards, setRecentBoards] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('recentBoards4chan');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
   const [threads, setThreads] = useState<Thread[]>([]);
   const [visibleThreads, setVisibleThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +59,171 @@ export default function Home() {
   };
 
   const currentBoardLabel = source === '2ch' ? '/b/' : `/${activeBoard}/`;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('favoriteBoards4chan', JSON.stringify(favoriteBoards));
+    } catch {}
+  }, [favoriteBoards]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('recentBoards4chan', JSON.stringify(recentBoards));
+    } catch {}
+  }, [recentBoards]);
+
+  const toggleFavorite = (boardCode: string) => {
+    setFavoriteBoards((prev) => {
+      if (prev.includes(boardCode)) return prev.filter((b) => b !== boardCode);
+      return [boardCode, ...prev].slice(0, 50);
+    });
+  };
+
+  const selectBoard = (boardCode: string) => {
+    setActiveBoard(boardCode);
+    setPage(1);
+    setIsBoardPickerOpen(false);
+    setRecentBoards((prev) => {
+      const next = [boardCode, ...prev.filter((b) => b !== boardCode)];
+      return next.slice(0, 15);
+    });
+  };
+
+  const boardMap = useMemo(() => {
+    const map = new Map<string, FourChanBoard>();
+    for (const b of boards) map.set(b.board, b);
+    return map;
+  }, [boards]);
+
+  type BoardSection = { title: string; items: FourChanBoard[] };
+
+  const fourChanSections: BoardSection[] = useMemo(() => {
+    const knownCategoryByBoard: Record<string, string> = {
+      a: 'Japanese Culture',
+      c: 'Japanese Culture',
+      m: 'Japanese Culture',
+      cgl: 'Japanese Culture',
+      cm: 'Japanese Culture',
+      f: 'Japanese Culture',
+      n: 'Japanese Culture',
+      jp: 'Japanese Culture',
+      vt: 'Video Games',
+      v: 'Video Games',
+      vg: 'Video Games',
+      vm: 'Video Games',
+      vmg: 'Video Games',
+      vr: 'Video Games',
+      vp: 'Video Games',
+      vst: 'Video Games',
+      g: 'Technology',
+      t: 'Technology',
+      e: 'Technology',
+      wsg: 'Technology',
+      sci: 'Technology',
+      tv: 'Television & Film',
+      k: 'Television & Film',
+      o: 'Television & Film',
+      pw: 'Television & Film',
+      lit: 'Interests',
+      his: 'Interests',
+      int: 'Interests',
+      out: 'Interests',
+      toy: 'Interests',
+      trv: 'Interests',
+      ck: 'Interests',
+      fit: 'Interests',
+      mu: 'Interests',
+      fa: 'Interests',
+      '3': 'Creative',
+      gd: 'Creative',
+      diy: 'Creative',
+      wtg: 'Creative',
+      ic: 'Creative',
+      w: 'Creative',
+      biz: 'Other',
+      pol: 'Other',
+      soc: 'Other',
+      s4s: 'Other',
+      b: 'Other',
+      r9k: 'Other',
+      gif: 'Other',
+      h: 'Adult',
+      hc: 'Adult',
+      hm: 'Adult',
+      hq: 'Adult',
+      hr: 'Adult',
+      hs: 'Adult',
+      u: 'Adult',
+      d: 'Adult',
+      y: 'Adult'
+    };
+
+    const categoryOrder = [
+      'Избранные',
+      'Недавние',
+      'Japanese Culture',
+      'Video Games',
+      'Technology',
+      'Television & Film',
+      'Interests',
+      'Creative',
+      'Other',
+      'Adult'
+    ];
+
+    const isAdult = (code: string) => knownCategoryByBoard[code] === 'Adult';
+
+    const favorites = favoriteBoards
+      .map((c) => boardMap.get(c))
+      .filter((b): b is FourChanBoard => Boolean(b));
+
+    const recents = recentBoards
+      .filter((c) => !favoriteBoards.includes(c))
+      .map((c) => boardMap.get(c))
+      .filter((b): b is FourChanBoard => Boolean(b));
+
+    const byCategory = new Map<string, FourChanBoard[]>();
+    for (const b of boards) {
+      const category = knownCategoryByBoard[b.board] || 'Other';
+      const list = byCategory.get(category) || [];
+      list.push(b);
+      byCategory.set(category, list);
+    }
+
+    for (const [cat, list] of byCategory) {
+      list.sort((a, b) => a.board.localeCompare(b.board));
+      if (cat !== 'Adult') continue;
+      list.sort((a, b) => a.board.localeCompare(b.board));
+    }
+
+    const sections: BoardSection[] = [];
+    if (favorites.length > 0) {
+      sections.push({ title: 'Избранные', items: favorites });
+    }
+    if (recents.length > 0) {
+      sections.push({ title: 'Недавние', items: recents });
+    }
+
+    for (const cat of categoryOrder) {
+      if (cat === 'Избранные' || cat === 'Недавние') continue;
+      const items = byCategory.get(cat) || [];
+      if (items.length === 0) continue;
+      if (cat === 'Adult' && favorites.length === 0 && recents.length === 0) {
+        if (items.length === 0) continue;
+      }
+      sections.push({ title: cat, items });
+    }
+
+    const hasAdult = sections.some((s) => s.title === 'Adult');
+    if (!hasAdult) {
+      const adult = boards.filter((b) => isAdult(b.board));
+      if (adult.length > 0) sections.push({ title: 'Adult', items: adult });
+    }
+
+    return sections;
+  }, [boards, boardMap, favoriteBoards, recentBoards]);
 
   const fetchThreads = async () => {
     setLoading(true);
@@ -280,28 +466,59 @@ export default function Home() {
                     </button>
                   </div>
                 ) : (
-                  <div className="p-3 grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  <div className="py-2">
                     {boards.length === 0 ? (
-                      <div className="col-span-3 sm:col-span-4 p-6 text-center text-gray-400">
+                      <div className="p-6 text-center text-gray-400">
                         Загрузка досок...
                       </div>
                     ) : (
-                      boards.map((b) => (
-                        <button
-                          key={b.board}
-                          className={`px-3 py-2 rounded-xl text-sm font-bold transition-colors ${
-                            activeBoard === b.board
-                              ? 'bg-green-500/20 text-green-300'
-                              : 'bg-gray-900 text-gray-200 hover:bg-gray-800'
-                          }`}
-                          onClick={() => {
-                            setActiveBoard(b.board);
-                            setPage(1);
-                            setIsBoardPickerOpen(false);
-                          }}
-                        >
-                          /{b.board}/
-                        </button>
+                      fourChanSections.map((section) => (
+                        <div key={section.title}>
+                          <div className="px-4 pt-4 pb-2 text-[11px] uppercase tracking-wider text-gray-400">
+                            {section.title}
+                          </div>
+                          <div className="px-2">
+                            {section.items.map((b) => (
+                              <div
+                                key={b.board}
+                                className={`flex items-center gap-2 px-2 py-2 rounded-xl transition-colors ${
+                                  activeBoard === b.board ? 'bg-green-500/10' : 'hover:bg-gray-900'
+                                }`}
+                              >
+                                <button
+                                  className="flex-1 text-left min-w-0"
+                                  onClick={() => selectBoard(b.board)}
+                                >
+                                  <div className="flex items-baseline gap-3 min-w-0">
+                                    <div className={`font-extrabold tracking-tight ${activeBoard === b.board ? 'text-green-300' : 'text-white'}`}>
+                                      /{b.board}/
+                                    </div>
+                                    <div className="text-sm text-gray-400 truncate">
+                                      {b.title}
+                                    </div>
+                                  </div>
+                                  {b.meta_description ? (
+                                    <div className="text-[11px] text-gray-500 line-clamp-1">
+                                      {b.meta_description}
+                                    </div>
+                                  ) : null}
+                                </button>
+
+                                <button
+                                  className={`p-2 rounded-full transition-colors ${
+                                    favoriteBoards.includes(b.board)
+                                      ? 'text-yellow-300 hover:bg-yellow-500/10'
+                                      : 'text-gray-500 hover:bg-gray-800'
+                                  }`}
+                                  onClick={() => toggleFavorite(b.board)}
+                                  title={favoriteBoards.includes(b.board) ? 'Убрать из избранного' : 'В избранное'}
+                                >
+                                  <Star size={18} fill={favoriteBoards.includes(b.board) ? 'currentColor' : 'none'} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       ))
                     )}
                   </div>

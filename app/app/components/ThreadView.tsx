@@ -7,6 +7,7 @@ import PostCard from './PostCard';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMedia, FullscreenItem } from '../context/MediaContext';
+import { disableBodyScroll, enableBodyScroll, clearAllBodyScrollLocks } from 'body-scroll-lock';
 
 interface ThreadViewProps {
   threadId: string;
@@ -46,6 +47,16 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
 
   useEffect(() => {
     fetchThread();
+  }, [threadId]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    disableBodyScroll(container);
+    return () => {
+      enableBodyScroll(container);
+      clearAllBodyScrollLocks();
+    };
   }, [threadId]);
 
   // Handle scroll direction within the overlay
@@ -134,7 +145,8 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
 
           <div 
             ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto pt-16"
+            className="flex-1 overflow-y-auto pt-16 overscroll-contain"
+            style={{ overscrollBehavior: 'contain' }}
           >
             {loading ? (
               <div className="flex justify-center items-center h-64">
