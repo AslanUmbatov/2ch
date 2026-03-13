@@ -5,15 +5,40 @@ import { Download, Loader2 } from 'lucide-react';
 import FullscreenPlayer from './FullscreenPlayer';
 import { FullscreenItem } from '../context/MediaContext';
 import { useMediaDownloader } from '../hooks/useMediaDownloader';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { disableBodyScroll, enableBodyScroll, clearAllBodyScrollLocks } from 'body-scroll-lock';
 
 interface FullscreenViewerProps {
   item: FullscreenItem | null;
   onClose: () => void;
+  onNext: () => void;
+  onPrev: () => void;
+  hasMultiple: boolean;
 }
 
-export default function FullscreenViewer({ item, onClose }: FullscreenViewerProps) {
+function ImageWithFallback({ src, alt }: { src: string; alt: string }) {
+  const [displaySrc, setDisplaySrc] = useState(src);
+
+  useEffect(() => {
+    setDisplaySrc(src);
+  }, [src]);
+
+  return (
+    <motion.img
+      src={displaySrc}
+      alt={alt}
+      className="max-w-full max-h-full object-contain rounded-lg shadow-lg touch-none"
+      drag={false}
+      onError={() => {
+        if (displaySrc.startsWith('https://i.4cdn.org/')) {
+          setDisplaySrc(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(displaySrc)}`);
+        }
+      }}
+    />
+  );
+}
+
+export default function FullscreenViewer({ item, onClose, onNext, onPrev, hasMultiple }: FullscreenViewerProps) {
   const { downloadMedia, isDownloading } = useMediaDownloader();
   const y = useMotionValue(0);
   const x = useMotionValue(0); // Track X for free movement
@@ -39,14 +64,24 @@ export default function FullscreenViewer({ item, onClose }: FullscreenViewerProp
     const { offset, velocity } = info;
     const swipeThreshold = 150; // Increased threshold
     const velocityThreshold = 500;
+    const horizontalThreshold = 100;
 
-    // Check if dismissed by distance or velocity
+    // Check if dismissed by distance or velocity (Vertical)
     if (
       Math.abs(offset.y) > swipeThreshold || 
       Math.abs(velocity.y) > velocityThreshold
     ) {
       // Just close, layoutId will handle the shrink animation
       onClose();
+    } else if (hasMultiple && Math.abs(offset.x) > horizontalThreshold) {
+      // Horizontal swipe
+      if (offset.x > 0) {
+        onPrev();
+      } else {
+        onNext();
+      }
+      // Reset position immediately to prepare for next item
+      controls.set({ x: 0, y: 0, scale: 1 });
     } else {
       // Snap back to center
       controls.start({ x: 0, y: 0, scale: 1 });
@@ -70,17 +105,19 @@ export default function FullscreenViewer({ item, onClose }: FullscreenViewerProp
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
                 >
                     <motion.div 
+                        key={item.src} // Add key to force re-render on item change for correct layoutId and animation
                         layoutId={item.layoutId}
                         animate={controls} 
+                        initial={{ x: 0, y: 0, scale: 1, opacity: 1 }}
                         onLayoutAnimationComplete={() => {
                             controls.set({ x: 0, y: 0, opacity: 1, scale: 1 });
                         }}
                         style={{ y, x, scale }}
-                        drag="y"
-                        dragConstraints={{ top: 0, bottom: 0 }}
+                        drag={true} // Enable drag in all directions
+                        dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
                         dragElastic={0.1} // Viscous feel
                         onDragEnd={handleDragEnd}
-                        className="relative w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing pointer-events-auto"
+                        className="relative w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing pointer-events-auto touch-none"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {item.type === 'video' ? (
@@ -93,11 +130,9 @@ export default function FullscreenViewer({ item, onClose }: FullscreenViewerProp
                                 />
                              </div>
                         ) : (
-                            <motion.img
+                            <ImageWithFallback
                                 src={item.src}
                                 alt={item.alt || 'Full size image'}
-                                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
-                                drag={false} 
                             />
                         )}
                         

@@ -7,12 +7,16 @@ import { useFeed } from '../context/FeedContext';
 
 interface CatalogCardProps {
   thread: Thread;
+  openThreadId?: string;
 }
 
-export default function CatalogCard({ thread }: CatalogCardProps) {
+export default function CatalogCard({ thread, openThreadId }: CatalogCardProps) {
   const { openThread } = useFeed();
   const file = thread.files && thread.files.length > 0 ? thread.files[0] : null;
-  const getMediaUrl = (path: string) => `https://2ch.org${path}`;
+  const getMediaUrl = (path: string) => {
+    if (path.startsWith('http')) return path;
+    return `https://2ch.org${path}`;
+  };
 
   // Strip HTML tags for preview text
   const stripHtml = (html: string) => {
@@ -26,11 +30,10 @@ export default function CatalogCard({ thread }: CatalogCardProps) {
   const simpleStrip = (html: string) => html.replace(/<[^>]*>?/gm, '');
 
   return (
-    <div onClick={() => openThread(thread.num.toString())} className="block h-full cursor-pointer">
+    <div onClick={() => openThread(openThreadId || thread.num.toString())} className="block h-full cursor-pointer">
       <motion.div  
         initial={{ opacity: 0, scale: 0.95 }}
-        whileInView={{ opacity: 1, scale: 1 }}
-        viewport={{ once: true }}
+        animate={{ opacity: 1, scale: 1 }}
         className="bg-gray-900 rounded-lg overflow-hidden hover:ring-1 hover:ring-orange-500 transition-all h-full flex flex-col relative group"
       >
         {/* Thumbnail */}

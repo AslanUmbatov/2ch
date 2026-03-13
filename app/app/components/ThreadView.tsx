@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { Thread } from '../types';
-import { getThread } from '../services/api';
+import { Thread, File } from '../types';
+import { get4ChanThread, getThread } from '../services/api';
 import PostCard from './PostCard';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useMedia } from '../context/MediaContext';
+import { useMedia, FullscreenItem } from '../context/MediaContext';
 
 interface ThreadViewProps {
   threadId: string;
@@ -17,7 +17,7 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
   const [thread, setThread] = useState<Thread | null>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const { fullscreenItem } = useMedia();
+  const { fullscreenItem, openFullscreen } = useMedia();
   const [scrollDirection, setScrollDirection] = useState<'up' | 'down'>('up');
   const lastScrollY = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -25,7 +25,14 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
   const fetchThread = async () => {
     setLoading(true);
     try {
-      const data = await getThread(threadId);
+      const parsed = threadId.startsWith('4chan:')
+        ? { source: '4chan' as const, board: threadId.split(':')[1] || 'b', id: threadId.split(':')[2] || '' }
+        : { source: '2ch' as const, id: threadId };
+
+      const data = parsed.source === '2ch'
+        ? await getThread(parsed.id)
+        : await get4ChanThread(parsed.board, parsed.id);
+
       if (data) {
         setThread(data.thread);
         setPosts(data.posts);
@@ -68,6 +75,35 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
     views: 0,
   });
 
+  const handleMediaClick = (file: File, postNum: number) => {
+    // Collect all media items from all posts in the thread
+    const playlist: FullscreenItem[] = posts.flatMap(post => 
+      (post.files || []).map((f: File) => ({
+        type: (f.path.endsWith('.webm') || f.path.endsWith('.mp4')) ? 'video' : 'image',
+        src: f.path.startsWith('http') ? f.path : `https://2ch.life${f.path}`,
+        poster: f.thumbnail.startsWith('http') ? f.thumbnail : `https://2ch.life${f.thumbnail}`,
+        alt: f.displayname,
+        layoutId: `media-${post.num}-${f.path}`,
+        currentTime: 0
+      }))
+    );
+
+    // Find the clicked item
+    const clickedItem = playlist.find(item => item.layoutId === `media-${postNum}-${file.path}`);
+    
+    if (clickedItem) {
+      openFullscreen(clickedItem, playlist);
+    }
+  };
+
+  const fallbackTitle = (() => {
+    if (!threadId.startsWith('4chan:')) return `Тред #${threadId}`;
+    const parts = threadId.split(':');
+    const board = parts[1] || 'b';
+    const id = parts[2] || '';
+    return `/${board}/ #${id}`;
+  })();
+
   return (
     <motion.div 
       initial={{ x: '100%' }}
@@ -86,7 +122,7 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
               <ArrowLeft size={20} />
             </button>
             <h1 className="text-lg font-bold tracking-tighter text-white truncate px-4 flex-1 text-center">
-              {thread?.subject || `Тред #${threadId}`}
+              {thread?.subject || fallbackTitle}
             </h1>
             <button 
               onClick={fetchThread}
@@ -111,6 +147,8 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
                      <PostCard 
                        thread={mapPostToThread(post)} 
                        hideFooter={true}
+                       onMediaClick={(file) => handleMediaClick(file, post.num)}
+                       enableHide={false}
                      />
                    </div>
                  ))}

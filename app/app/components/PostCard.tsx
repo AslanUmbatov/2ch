@@ -10,10 +10,20 @@ interface PostCardProps {
   thread: Thread;
   onMediaClick?: (file: File) => void; // Made optional as we handle it internally now
   hideFooter?: boolean;
+  openThreadId?: string;
+  threadKey?: string;
+  enableHide?: boolean;
 }
 
-const getMediaUrl = (path: string) => `https://2ch.life${path}`;
-const getThumbnailUrl = (file: File) => `https://2ch.life${file.thumbnail}`;
+const getMediaUrl = (path: string) => {
+  if (path.startsWith('http')) return path;
+  return `https://2ch.life${path}`;
+};
+
+const getThumbnailUrl = (file: File) => {
+  if (file.thumbnail.startsWith('http')) return file.thumbnail;
+  return `https://2ch.life${file.thumbnail}`;
+};
 
 // Component for video thumbnail that opens fullscreen player
 const VideoThumbnail = ({ file, className, layoutId }: { file: File, className: string, layoutId: string }) => {
@@ -67,10 +77,10 @@ const VideoThumbnail = ({ file, className, layoutId }: { file: File, className: 
   );
 };
 
-export default function PostCard({ thread, onMediaClick, hideFooter = false }: PostCardProps) {
+export default function PostCard({ thread, onMediaClick, hideFooter = false, openThreadId, threadKey, enableHide = true }: PostCardProps) {
   const files = thread.files || [];
   const { openFullscreen, activeLayoutId } = useMedia();
-  const { openThread } = useFeed();
+  const { openThread, hideThread } = useFeed();
   
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString('ru-RU', {
@@ -93,28 +103,44 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false }: P
   };
 
     const handleImageClick = (file: File) => {
+      if (onMediaClick) {
+        onMediaClick(file);
+        return;
+      }
       openFullscreen({
           type: 'image',
           src: getMediaUrl(file.path),
           alt: file.displayname,
           layoutId: `media-${thread.num}-${file.path}`
       });
-      // Call prop if provided (for backward compatibility or extra side effects)
-      if (onMediaClick) onMediaClick(file);
-  };
+    };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-50px" }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className="bg-black border-b border-gray-800 pb-6 mb-2"
     >
       {/* Header */}
       <div className="px-4 py-3 flex justify-between items-center text-gray-500 text-xs">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-gray-400">#{thread.num}</span>
+          <span
+            className={`font-medium text-gray-400 ${enableHide ? 'hover:text-red-500 cursor-pointer transition-colors' : ''}`}
+            onClick={
+              enableHide
+                ? (e) => {
+                    e.stopPropagation();
+                    if (confirm('Скрыть этот тред навсегда?')) {
+                      hideThread(threadKey || thread.num.toString());
+                    }
+                  }
+                : undefined
+            }
+            title={enableHide ? 'Скрыть тред' : undefined}
+          >
+            #{thread.num}
+          </span>
           <span>•</span>
           <span>{formatDate(thread.timestamp)}</span>
         </div>
@@ -146,7 +172,6 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false }: P
                   loading="lazy"
                   style={{ opacity: activeLayoutId === `media-${thread.num}-${file.path}` ? 0 : 1 }}
                   onError={(e) => {
-                     // Try thumbnail if full fails (unlikely but possible)
                      e.currentTarget.src = getThumbnailUrl(file);
                   }}
                 />
@@ -173,7 +198,7 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false }: P
       {!hideFooter && (
         <div className="mt-4 px-4 flex justify-end items-center text-gray-500 text-xs">
             <button 
-                onClick={() => openThread(thread.num.toString())}
+                onClick={() => openThread(openThreadId || thread.num.toString())}
                 className="flex items-center gap-1.5 hover:text-white transition-colors p-2 rounded-full hover:bg-gray-900"
             >
               <MessageSquare size={16} />

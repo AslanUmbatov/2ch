@@ -266,3 +266,269 @@ export async function getThread(id: string): Promise<{ thread: Thread, posts: an
     return null;
   }
 }
+
+export interface FourChanBoard {
+  board: string;
+  title: string;
+  ws_board?: number;
+  per_page?: number;
+  pages?: number;
+}
+
+type FourChanBoardsResponse = {
+  boards: FourChanBoard[];
+};
+
+type FourChanPost = {
+  no: number;
+  time: number;
+  sub?: string;
+  com?: string;
+  tim?: number;
+  ext?: string;
+  filename?: string;
+  w?: number;
+  h?: number;
+  fsize?: number;
+  tn_w?: number;
+  tn_h?: number;
+};
+
+type FourChanThreadResponse = {
+  posts: FourChanPost[];
+};
+
+type FourChanCatalogThread = FourChanPost & {
+  replies?: number;
+  images?: number;
+  last_modified?: number;
+};
+
+type FourChanCatalogPage = {
+  page: number;
+  threads: FourChanCatalogThread[];
+};
+
+const parseJsonIfString = (data: any) => {
+  if (typeof data === 'string') {
+    try {
+      return JSON.parse(data);
+    } catch {
+      return data;
+    }
+  }
+  return data;
+};
+
+async function fetchJsonUrl(url: string) {
+  const userAgent =
+    'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+
+  const tryDirect = async () => {
+    if (Capacitor.isNativePlatform()) {
+      const response = await fetchWithTimeout(
+        CapacitorHttp.get({
+          url,
+          headers: {
+            Accept: 'application/json',
+            'Cache-Control': 'no-cache',
+            'User-Agent': userAgent
+          },
+          connectTimeout: 8000,
+          readTimeout: 8000
+        }),
+        12000
+      );
+      if (response.status !== 200) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.data;
+    }
+
+    const response = await fetchWithTimeout(fetch(url), 12000);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return response.json();
+  };
+
+  try {
+    return await tryDirect();
+  } catch (directError) {
+    const errors: string[] = [];
+    errors.push(`direct - ${(directError as Error)?.message || 'unknown error'}`);
+
+    for (const proxy of CORS_PROXIES) {
+      const targetUrl = encodeURIComponent(url);
+      let proxyUrl = '';
+
+      if (proxy.url.includes('corsproxy.io')) {
+        proxyUrl = `${proxy.url}${targetUrl}`;
+      } else {
+        proxyUrl = `${proxy.url}${targetUrl}`;
+      }
+
+      if (proxy.url.includes('allorigins')) {
+        proxyUrl += `&t=${Date.now()}`;
+      }
+
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const response = await fetchWithTimeout(
+            CapacitorHttp.get({
+              url: proxyUrl,
+              headers: {
+                Accept: 'application/json',
+                'Cache-Control': 'no-cache',
+                'User-Agent': userAgent
+              },
+              connectTimeout: 8000,
+              readTimeout: 8000
+            }),
+            12000
+          );
+
+          if (response.status !== 200) {
+            errors.push(`${proxy.url} - HTTP ${response.status}`);
+            continue;
+          }
+
+          const data = response.data;
+          const parsed = parseJsonIfString(data);
+          if (proxy.type === 'json_wrapper') {
+            const wrapper = parsed as { contents?: unknown };
+            if (typeof wrapper?.contents === 'string') {
+              return JSON.parse(wrapper.contents);
+            }
+            if (wrapper?.contents) return wrapper.contents;
+            errors.push(`${proxy.url} - Missing contents`);
+            continue;
+          }
+
+          return parsed;
+        }
+
+        const response = await fetchWithTimeout(fetch(proxyUrl), 12000);
+        if (!response.ok) {
+          errors.push(`${proxy.url} - HTTP ${response.status}`);
+          continue;
+        }
+
+        const text = await response.text();
+        if (isHtmlResponse(text)) {
+          errors.push(`${proxy.url} - HTML response`);
+          continue;
+        }
+
+        const parsed = JSON.parse(text);
+        if (proxy.type === 'json_wrapper') {
+          if (typeof parsed?.contents === 'string') {
+            return JSON.parse(parsed.contents);
+          }
+          if (parsed?.contents) return parsed.contents;
+          errors.push(`${proxy.url} - Missing contents`);
+          continue;
+        }
+
+        return parsed;
+      } catch (e) {
+        errors.push(`${proxy.url} - ${(e as Error)?.message || 'unknown error'}`);
+      }
+    }
+
+    throw new Error(`Failed to fetch JSON. Errors: ${errors.join('; ')}`);
+  }
+}
+
+const build4ChanFile = (board: string, post: FourChanPost) => {
+  if (!post.tim || !post.ext) return null;
+
+  const extLower = post.ext.toLowerCase();
+  const src = `https://i.4cdn.org/${board}/${post.tim}${extLower}`;
+  const thumbnail = `https://i.4cdn.org/${board}/${post.tim}s.jpg`;
+  const name = `${post.filename || post.tim}${extLower}`;
+  const ext = extLower;
+  const proxiedSrc = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(src)}`;
+
+  const type =
+    ext === '.webm' ? 6 :
+    ext === '.mp4' ? 10 :
+    1;
+
+  return {
+    path: proxiedSrc,
+    thumbnail,
+    displayname: name,
+    fullname: name,
+    width: post.w || 0,
+    height: post.h || 0,
+    size: post.fsize || 0,
+    type
+  };
+};
+
+const normalize4ChanPost = (board: string, post: FourChanPost) => {
+  const file = build4ChanFile(board, post);
+  return {
+    num: post.no,
+    comment: post.com || '',
+    subject: post.sub || '',
+    timestamp: post.time,
+    files: file ? [file] : [],
+    posts_count: 0,
+    views: 0
+  };
+};
+
+export async function get4ChanBoards(): Promise<FourChanBoard[]> {
+  const data = await fetchJsonUrl('https://a.4cdn.org/boards.json');
+  const parsed = parseJsonIfString(data) as FourChanBoardsResponse;
+  return Array.isArray(parsed?.boards) ? parsed.boards : [];
+}
+
+export async function get4ChanCatalog(board: string): Promise<Thread[]> {
+  const safeBoard = board.replaceAll('/', '').trim();
+  const data = await fetchJsonUrl(`https://a.4cdn.org/${safeBoard}/catalog.json`);
+  const parsed = parseJsonIfString(data) as FourChanCatalogPage[];
+  if (!Array.isArray(parsed)) return [];
+
+  const threads: Thread[] = [];
+  for (const page of parsed) {
+    for (const t of page.threads || []) {
+      const file = build4ChanFile(safeBoard, t);
+      threads.push({
+        num: t.no,
+        comment: t.com || '',
+        subject: t.sub || '',
+        timestamp: t.time,
+        files: file ? [file] : [],
+        posts_count: (t.replies || 0) + 1,
+        views: 0
+      });
+    }
+  }
+  return threads;
+}
+
+export async function get4ChanThread(board: string, id: string): Promise<{ thread: Thread; posts: any[] } | null> {
+  const safeBoard = board.replaceAll('/', '').trim();
+  const safeId = id.trim();
+  const data = await fetchJsonUrl(`https://a.4cdn.org/${safeBoard}/thread/${safeId}.json`);
+  const parsed = parseJsonIfString(data) as FourChanThreadResponse;
+  if (!parsed?.posts || !Array.isArray(parsed.posts) || parsed.posts.length === 0) return null;
+
+  const normalizedPosts = parsed.posts.map(p => normalize4ChanPost(safeBoard, p));
+  const op = normalizedPosts[0];
+
+  const thread: Thread = {
+    num: op.num,
+    comment: op.comment,
+    subject: op.subject,
+    timestamp: op.timestamp,
+    files: op.files,
+    posts_count: normalizedPosts.length,
+    views: 0
+  };
+
+  return { thread, posts: normalizedPosts };
+}
