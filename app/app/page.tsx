@@ -16,7 +16,6 @@ export default function Home() {
   const [source, setSource] = useState<'2ch' | '4chan'>('2ch');
   const [boards, setBoards] = useState<FourChanBoard[]>([]);
   const [activeBoard, setActiveBoard] = useState('b');
-  const [isBoardPickerOpen, setIsBoardPickerOpen] = useState(false);
   const [favoriteBoards, setFavoriteBoards] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -48,7 +47,7 @@ export default function Home() {
   const observerTarget = useRef<HTMLDivElement>(null);
   const scrollDirection = useScrollDirection();
   const { fullscreenItem } = useMedia();
-  const { activeThreadId, closeThread, hiddenThreads } = useFeed();
+  const { activeThreadId, closeThread, hiddenThreads, isBoardPickerOpen, openBoardPicker, closeBoardPicker } = useFeed();
 
   const getThreadKey = (t: Thread) => {
     return source === '2ch' ? `2ch:${t.num}` : `4chan:${activeBoard}:${t.num}`;
@@ -84,7 +83,7 @@ export default function Home() {
   const selectBoard = (boardCode: string) => {
     setActiveBoard(boardCode);
     setPage(1);
-    setIsBoardPickerOpen(false);
+    closeBoardPicker();
     setRecentBoards((prev) => {
       const next = [boardCode, ...prev.filter((b) => b !== boardCode)];
       return next.slice(0, 15);
@@ -327,7 +326,7 @@ export default function Home() {
            </button>
 
            <button
-             onClick={() => setIsBoardPickerOpen(true)}
+             onClick={openBoardPicker}
              className="text-xl font-bold tracking-tighter text-white hover:text-gray-200 transition-colors truncate"
              title="Выбрать доску"
            >
@@ -433,7 +432,7 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setIsBoardPickerOpen(false)}
+            onClick={closeBoardPicker}
           >
             <motion.div
               className="absolute left-1/2 top-20 -translate-x-1/2 w-[calc(100%-32px)] max-w-[600px] bg-black border border-gray-800 rounded-2xl shadow-2xl overflow-hidden"
@@ -446,7 +445,7 @@ export default function Home() {
               <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
                 <div className="font-bold tracking-tight text-white">Доски</div>
                 <button
-                  onClick={() => setIsBoardPickerOpen(false)}
+                  onClick={closeBoardPicker}
                   className="px-3 py-1.5 rounded-full hover:bg-gray-800 transition-colors text-sm text-gray-200"
                 >
                   Закрыть
@@ -459,7 +458,7 @@ export default function Home() {
                     <button
                       className="w-full text-left px-4 py-3 rounded-xl hover:bg-gray-900 transition-colors font-bold text-white"
                       onClick={() => {
-                        setIsBoardPickerOpen(false);
+                        closeBoardPicker();
                       }}
                     >
                       /b/

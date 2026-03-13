@@ -8,12 +8,20 @@ interface FeedContextType {
   closeThread: () => void;
   hiddenThreads: string[];
   hideThread: (threadId: string) => void;
+  isBoardPickerOpen: boolean;
+  openBoardPicker: () => void;
+  closeBoardPicker: () => void;
+  repliesOverlay: { threadId: string; postNum: string } | null;
+  openRepliesOverlay: (threadId: string, postNum: string | number) => void;
+  closeRepliesOverlay: () => void;
 }
 
 const FeedContext = createContext<FeedContextType | undefined>(undefined);
 
 export function FeedProvider({ children }: { children: ReactNode }) {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [isBoardPickerOpen, setIsBoardPickerOpen] = useState(false);
+  const [repliesOverlay, setRepliesOverlay] = useState<{ threadId: string; postNum: string } | null>(null);
   const [hiddenThreads, setHiddenThreads] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -31,15 +39,26 @@ export function FeedProvider({ children }: { children: ReactNode }) {
 
   const openThread = (threadId: string) => {
     setActiveThreadId(threadId);
+    setRepliesOverlay(null);
     // Prevent body scroll when thread is open
     document.body.style.overflow = 'hidden';
   };
 
   const closeThread = () => {
     setActiveThreadId(null);
+    setRepliesOverlay(null);
     // Restore body scroll
     document.body.style.overflow = '';
   };
+
+  const openBoardPicker = () => setIsBoardPickerOpen(true);
+  const closeBoardPicker = () => setIsBoardPickerOpen(false);
+
+  const openRepliesOverlay = (threadId: string, postNum: string | number) => {
+    setRepliesOverlay({ threadId, postNum: String(postNum) });
+  };
+
+  const closeRepliesOverlay = () => setRepliesOverlay(null);
 
   const hideThread = (threadId: string) => {
     setHiddenThreads(prev => {
@@ -53,7 +72,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <FeedContext.Provider value={{ activeThreadId, openThread, closeThread, hiddenThreads, hideThread }}>
+    <FeedContext.Provider value={{ activeThreadId, openThread, closeThread, hiddenThreads, hideThread, isBoardPickerOpen, openBoardPicker, closeBoardPicker, repliesOverlay, openRepliesOverlay, closeRepliesOverlay }}>
       {children}
     </FeedContext.Provider>
   );

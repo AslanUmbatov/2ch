@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Thread, File } from '../types';
 import { get4ChanThread, getThread } from '../services/api';
 import PostCard from './PostCard';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ArrowLeft, MessageSquare, RefreshCw } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useMedia, FullscreenItem } from '../context/MediaContext';
 import { disableBodyScroll, enableBodyScroll, clearAllBodyScrollLocks } from 'body-scroll-lock';
+import { useFeed } from '../context/FeedContext';
 
 interface ThreadViewProps {
   threadId: string;
@@ -19,6 +20,7 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { fullscreenItem, openFullscreen } = useMedia();
+  const { repliesOverlay, openRepliesOverlay, closeRepliesOverlay } = useFeed();
   const [scrollDirection, setScrollDirection] = useState<'up' | 'down'>('up');
   const lastScrollY = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -76,6 +78,48 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const repliesByTarget = useMemo(() => {
+    const map = new Map<string, any[]>();
+
+    const getText = (htmlOrText: string) => {
+      try {
+        if (htmlOrText.includes('<')) {
+          const doc = new DOMParser().parseFromString(htmlOrText, 'text/html');
+          return doc.body.textContent || '';
+        }
+      } catch {}
+      return htmlOrText;
+    };
+
+    const extractTargets = (text: string) => {
+      const targets = new Set<string>();
+      const cleaned = getText(text);
+      const re = />>\s*(\d+)/g;
+      let match: RegExpExecArray | null = null;
+      while ((match = re.exec(cleaned)) !== null) {
+        if (match[1]) targets.add(match[1]);
+      }
+      return targets;
+    };
+
+    for (const post of posts) {
+      const targets = extractTargets(String(post?.comment || ''));
+      for (const target of targets) {
+        const list = map.get(target) || [];
+        list.push(post);
+        map.set(target, list);
+      }
+    }
+
+    return map;
+  }, [posts]);
+
+  const overlayReplies = useMemo(() => {
+    if (!repliesOverlay) return [];
+    if (repliesOverlay.threadId !== threadId) return [];
+    return repliesByTarget.get(repliesOverlay.postNum) || [];
+  }, [repliesByTarget, repliesOverlay, threadId]);
+
   const mapPostToThread = (post: any): Thread => ({
     num: post.num,
     comment: post.comment,
@@ -85,6 +129,15 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
     posts_count: 0, 
     views: 0,
   });
+
+  const pluralize = (count: number, one: string, few: string, many: string) => {
+    const n = Math.abs(count) % 100;
+    const n1 = n % 10;
+    if (n > 10 && n < 20) return many;
+    if (n1 > 1 && n1 < 5) return few;
+    if (n1 === 1) return one;
+    return many;
+  };
 
   const handleMediaClick = (file: File, postNum: number) => {
     // Collect all media items from all posts in the thread
@@ -159,14 +212,79 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
                      <PostCard 
                        thread={mapPostToThread(post)} 
                        hideFooter={true}
+                        hideDivider={true}
+                      compact={true}
                        onMediaClick={(file) => handleMediaClick(file, post.num)}
                        enableHide={false}
                      />
+                      {(() => {
+                        const replyCount = (repliesByTarget.get(String(post.num)) || []).length;
+                        if (replyCount <= 0) return null;
+                        const label = `${replyCount} ${pluralize(replyCount, 'Ответ', 'Ответа', 'Ответов')}`;
+                        return (
+                          <div className="px-4 pt-1 pb-3 flex justify-end items-center text-gray-500 text-xs bg-black">
+                            <button
+                              onClick={() => openRepliesOverlay(threadId, post.num)}
+                              className="flex items-center gap-1.5 hover:text-white transition-colors p-2 rounded-full hover:bg-gray-900"
+                            >
+                              <MessageSquare size={16} />
+                              <span>{label}</span>
+                            </button>
+                          </div>
+                        );
+                      })()}
                    </div>
                  ))}
               </div>
             )}
           </div>
+
+          <AnimatePresence>
+            {!repliesOverlay || repliesOverlay.threadId !== threadId ? null : (
+              <motion.div
+                className="absolute inset-0 z-[60] bg-black flex flex-col"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <header className="bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50">
+                  <button
+                    onClick={closeRepliesOverlay}
+                    className="p-2 hover:bg-gray-800 rounded-full transition-colors"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                  <h2 className="text-lg font-bold tracking-tighter text-white truncate px-4 flex-1 text-center">
+                    Ответы на #{repliesOverlay.postNum}
+                  </h2>
+                  <div className="w-9" />
+                </header>
+
+                <div className="flex-1 overflow-y-auto overscroll-contain pt-2" style={{ overscrollBehavior: 'contain' }}>
+                  {overlayReplies.length === 0 ? (
+                    <div className="p-6 text-center text-gray-400">
+                      Нет ответов
+                    </div>
+                  ) : (
+                    <div className="pb-20">
+                      {overlayReplies.map((p) => (
+                        <div key={p.num} className="border-b border-gray-800">
+                          <PostCard
+                            thread={mapPostToThread(p)}
+                            hideFooter={true}
+                            hideDivider={true}
+                            compact={true}
+                            onMediaClick={(file) => handleMediaClick(file, p.num)}
+                            enableHide={false}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
        </div>
     </motion.div>
   );

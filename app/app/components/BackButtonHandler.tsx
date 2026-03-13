@@ -10,14 +10,14 @@ export default function BackButtonHandler() {
   const router = useRouter();
   const pathname = usePathname();
   const { fullscreenItem, closeFullscreen } = useMedia();
-  const { activeThreadId, closeThread } = useFeed();
+  const { activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay } = useFeed();
 
   // Use refs to keep latest state accessible in the event listener without re-binding
-  const stateRef = useRef({ fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread });
+  const stateRef = useRef({ fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay });
 
   useEffect(() => {
-    stateRef.current = { fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread };
-  }, [fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread]);
+    stateRef.current = { fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay };
+  }, [fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay]);
 
   useEffect(() => {
     let listenerHandle: any;
@@ -26,11 +26,15 @@ export default function BackButtonHandler() {
     const setupListener = async () => {
       try {
         const handle = await App.addListener('backButton', ({ canGoBack }) => {
-            const { fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread } = stateRef.current;
+            const { fullscreenItem, closeFullscreen, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay } = stateRef.current;
             
             if (fullscreenItem) {
                 // If modal is open (video or image), close it and consume the event
                 closeFullscreen();
+            } else if (repliesOverlay) {
+                closeRepliesOverlay();
+            } else if (isBoardPickerOpen) {
+                closeBoardPicker();
             } else if (activeThreadId) {
                 // If thread overlay is open, close it
                 closeThread();

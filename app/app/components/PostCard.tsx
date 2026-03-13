@@ -13,6 +13,8 @@ interface PostCardProps {
   openThreadId?: string;
   threadKey?: string;
   enableHide?: boolean;
+  hideDivider?: boolean;
+  compact?: boolean;
 }
 
 const getMediaUrl = (path: string) => {
@@ -77,7 +79,7 @@ const VideoThumbnail = ({ file, className, layoutId }: { file: File, className: 
   );
 };
 
-export default function PostCard({ thread, onMediaClick, hideFooter = false, openThreadId, threadKey, enableHide = true }: PostCardProps) {
+export default function PostCard({ thread, onMediaClick, hideFooter = false, openThreadId, threadKey, enableHide = true, hideDivider = false, compact = false }: PostCardProps) {
   const files = thread.files || [];
   const { openFullscreen, activeLayoutId } = useMedia();
   const { openThread, hideThread } = useFeed();
@@ -120,7 +122,7 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false, ope
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="bg-black border-b border-gray-800 pb-6 mb-2"
+      className={`bg-black pb-6 ${compact ? 'mb-0' : 'mb-2'} ${hideDivider ? '' : 'border-b border-gray-800'}`}
     >
       {/* Header */}
       <div className="px-4 py-3 flex justify-between items-center text-gray-500 text-xs">
