@@ -2,8 +2,9 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, Volume2, VolumeX, Loader2, Download, X } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Loader2, Download, Maximize2, X } from 'lucide-react';
 import { useMediaDownloader } from '../hooks/useMediaDownloader';
+import { useMedia } from '../context/MediaContext';
 
 interface FullscreenPlayerProps {
   src: string;
@@ -14,14 +15,17 @@ interface FullscreenPlayerProps {
 
 export default function FullscreenPlayer({ src, poster, initialTime = 0, onClose }: FullscreenPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(initialTime);
   const [duration, setDuration] = useState(0);
   const [isBuffering, setIsBuffering] = useState(true);
   const [showControls, setShowControls] = useState(true);
+  const [isSeeking, setIsSeeking] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { downloadMedia, isDownloading } = useMediaDownloader();
+  const { isVideoLandscape, toggleVideoLandscape } = useMedia();
 
   // Initialize video
   useEffect(() => {
@@ -101,34 +105,79 @@ export default function FullscreenPlayer({ src, poster, initialTime = 0, onClose
   const handleTimeUpdate = () => {
     const video = videoRef.current;
     if (!video) return;
+    if (isSeeking) return;
     setCurrentTime(video.currentTime);
     setDuration(video.duration || 0);
   };
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.stopPropagation();
+  const seekToClientX = (clientX: number) => {
     const video = videoRef.current;
-    if (!video) return;
+    const progressBar = progressBarRef.current;
+    if (!video || !progressBar || !video.duration || !isFinite(video.duration)) return;
 
-    const progressBar = e.currentTarget;
     const rect = progressBar.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percentage = Math.max(0, Math.min(1, x / rect.width));
-    
+    const x = clientX - rect.left;
+    const percentage = rect.width > 0 ? Math.max(0, Math.min(1, x / rect.width)) : 0;
+
     video.currentTime = percentage * video.duration;
     setCurrentTime(video.currentTime);
   };
 
+  const handleSeekClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    seekToClientX(e.clientX);
+  };
+
+  const handleSeekPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    setIsSeeking(true);
+    seekToClientX(e.clientX);
+  };
+
+  const handleSeekPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isSeeking) return;
+    e.stopPropagation();
+    e.preventDefault();
+    seekToClientX(e.clientX);
+  };
+
+  const handleSeekPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isSeeking) return;
+    e.stopPropagation();
+    e.preventDefault();
+    setIsSeeking(false);
+    try {
+      (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
+
   return (
-    <div 
-      className="relative w-full h-full flex items-center justify-center"
-      onMouseMove={handleInteraction}
-      onTouchStart={handleInteraction}
-      onClick={(e) => {
-        // Toggle play on container click (if not on controls)
-        togglePlay(e);
-      }}
-    >
+    <div className="relative w-full h-full">
+      <div
+        className="relative w-full h-full flex items-center justify-center"
+        onMouseMove={handleInteraction}
+        onTouchStart={handleInteraction}
+        onClick={(e) => {
+          togglePlay(e);
+        }}
+        style={
+          isVideoLandscape
+            ? {
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                width: '100vh',
+                height: '100vw',
+                transform: 'translate(-50%, -50%) rotate(90deg)',
+                transformOrigin: 'center'
+              }
+            : undefined
+        }
+      >
         {/* Close Button (Top Right) */}
         <button 
             className="absolute top-4 right-4 text-white/70 hover:text-white p-2 z-50 bg-black/50 rounded-full backdrop-blur-md transition-colors"
@@ -204,8 +253,13 @@ export default function FullscreenPlayer({ src, poster, initialTime = 0, onClose
               <div className="max-w-4xl mx-auto w-full space-y-4">
                  {/* Progress Bar Container */}
                  <div 
+                    ref={progressBarRef}
                     className="relative w-full h-4 group cursor-pointer flex items-center"
-                    onClick={handleSeek}
+                    onClick={handleSeekClick}
+                    onPointerDown={handleSeekPointerDown}
+                    onPointerMove={handleSeekPointerMove}
+                    onPointerUp={handleSeekPointerUp}
+                    onPointerCancel={handleSeekPointerUp}
                  >
                     {/* Background Line */}
                     <div className="absolute w-full h-[2px] bg-white/20 group-hover:h-[4px] transition-all duration-200 rounded-full" />
@@ -213,14 +267,13 @@ export default function FullscreenPlayer({ src, poster, initialTime = 0, onClose
                     {/* Active Progress */}
                     <motion.div 
                         className="absolute h-[2px] bg-cyan-400 group-hover:h-[4px] transition-all duration-200 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.5)]"
-                        style={{ width: `${(currentTime / duration) * 100}%` }}
-                        layoutId="progress"
+                        style={{ width: `${progressPercent}%` }}
                     />
                     
                     {/* Thumb (only visible on hover) */}
                     <div 
                         className="absolute h-3 w-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg scale-0 group-hover:scale-100"
-                        style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translateX(-50%)' }}
+                        style={{ left: `${progressPercent}%`, transform: 'translateX(-50%)' }}
                     />
                  </div>
 
@@ -250,6 +303,16 @@ export default function FullscreenPlayer({ src, poster, initialTime = 0, onClose
 
                     {/* Right side controls */}
                     <div className="flex items-center gap-4">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleVideoLandscape();
+                            }}
+                            className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full"
+                            title="Полный экран"
+                        >
+                            <Maximize2 size={20} />
+                        </button>
                         <button 
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -268,6 +331,7 @@ export default function FullscreenPlayer({ src, poster, initialTime = 0, onClose
           )}
         </AnimatePresence>
       </div>
+    </div>
     );
   }
 

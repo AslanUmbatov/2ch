@@ -23,10 +23,13 @@ interface MediaContextType {
   setPlayingVideoId: (id: string | null) => void;
   // Modal State
   fullscreenItem: FullscreenItem | null;
+  isVideoLandscape: boolean;
   playlist: FullscreenItem[];
   currentIndex: number;
   openFullscreen: (item: FullscreenItem, playlist?: FullscreenItem[]) => void;
   closeFullscreen: () => void;
+  toggleVideoLandscape: () => void;
+  exitVideoLandscape: () => void;
   nextMedia: () => void;
   prevMedia: () => void;
   updateFullscreenTime: (time: number) => void;
@@ -39,6 +42,7 @@ const MediaContext = createContext<MediaContextType | undefined>(undefined);
 export function MediaProvider({ children }: { children: ReactNode }) {
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
   const [fullscreenItem, setFullscreenItem] = useState<FullscreenItem | null>(null);
+  const [isVideoLandscape, setIsVideoLandscape] = useState(false);
   const [playlist, setPlaylist] = useState<FullscreenItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [activeLayoutId, setActiveLayoutId] = useState<string | null>(null);
@@ -52,6 +56,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     }
 
     setFullscreenItem(item);
+    setIsVideoLandscape(false);
     if (newPlaylist.length > 0) {
       setPlaylist(newPlaylist);
       // Find index by checking src or some unique ID
@@ -77,6 +82,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
 
   const closeFullscreen = () => {
     setFullscreenItem(null);
+    setIsVideoLandscape(false);
     setPlaylist([]);
     setCurrentIndex(-1);
     setPlayingVideoId(null);
@@ -100,6 +106,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     const newIndex = (currentIndex - 1 + playlist.length) % playlist.length;
     setCurrentIndex(newIndex);
     setFullscreenItem(playlist[newIndex]);
+    setIsVideoLandscape(false);
   };
 
   const updateFullscreenTime = (time: number) => {
@@ -108,15 +115,27 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const toggleVideoLandscape = () => {
+    if (!fullscreenItem || fullscreenItem.type !== 'video') return;
+    setIsVideoLandscape((v) => !v);
+  };
+
+  const exitVideoLandscape = () => {
+    setIsVideoLandscape(false);
+  };
+
   return (
     <MediaContext.Provider value={{ 
       playingVideoId, 
       setPlayingVideoId, 
       fullscreenItem,
+      isVideoLandscape,
       playlist,
       currentIndex, 
       openFullscreen, 
       closeFullscreen,
+      toggleVideoLandscape,
+      exitVideoLandscape,
       nextMedia,
       prevMedia,
       updateFullscreenTime,
