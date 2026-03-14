@@ -29,6 +29,8 @@ function ImageWithFallback({ src, alt }: { src: string; alt: string }) {
       alt={alt}
       className="max-w-full max-h-full object-contain rounded-lg shadow-lg touch-none"
       drag={false}
+      draggable={false}
+      onDragStart={(e) => e.preventDefault()}
       onError={() => {
         if (displaySrc.startsWith('https://i.4cdn.org/')) {
           setDisplaySrc(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(displaySrc)}`);

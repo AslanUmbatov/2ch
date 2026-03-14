@@ -52,6 +52,8 @@ const VideoThumbnail = ({ file, className, layoutId }: { file: File, className: 
         alt={file.displayname}
         className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
         loading="lazy"
+        draggable={false}
+        onDragStart={(e) => e.preventDefault()}
         onError={(e) => {
           // Fallback to full image if thumbnail fails
            e.currentTarget.src = getMediaUrl(file.path);
@@ -172,6 +174,8 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false, ope
                   className={`w-full h-full bg-gray-900 cursor-zoom-in ${files.length > 1 ? 'object-cover aspect-square' : 'object-contain max-h-[600px]'}`}
                   onClick={() => handleImageClick(file)}
                   loading="lazy"
+                  draggable={false}
+                  onDragStart={(e) => e.preventDefault()}
                   style={{ opacity: activeLayoutId === `media-${thread.num}-${file.path}` ? 0 : 1 }}
                   onError={(e) => {
                      e.currentTarget.src = getThumbnailUrl(file);
