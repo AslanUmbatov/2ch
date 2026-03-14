@@ -49,6 +49,14 @@ export default function Home() {
   const { fullscreenItem } = useMedia();
   const { activeThreadId, closeThread, hiddenThreads, isBoardPickerOpen, openBoardPicker, closeBoardPicker, isSavedMode, toggleSavedMode, savedThreads, refreshSavedThreads, activeThreadSave, deleteSavedThread } = useFeed();
 
+  useEffect(() => {
+    const handler = () => {
+      setViewMode((prev) => (prev === 'feed' ? 'catalog' : 'feed'));
+    };
+    window.addEventListener('app:toggleViewMode', handler);
+    return () => window.removeEventListener('app:toggleViewMode', handler);
+  }, []);
+
   const getThreadKey = (t: Thread) => {
     return source === '2ch' ? `2ch:${t.num}` : `4chan:${activeBoard}:${t.num}`;
   };

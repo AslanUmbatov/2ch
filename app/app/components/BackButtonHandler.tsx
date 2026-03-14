@@ -45,8 +45,9 @@ export default function BackButtonHandler() {
                 toggleSavedMode();
             } else {
                 if (pathname === '/') {
-                    // If on home page, minimize app (standard Android behavior)
-                    App.exitApp();
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(new Event('app:toggleViewMode'));
+                    }
                 } else {
                     // Go back in history
                     router.back();
