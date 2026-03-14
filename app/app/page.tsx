@@ -5,8 +5,8 @@ import PostCard from './components/PostCard';
 import CatalogCard from './components/CatalogCard';
 import { Thread } from './types';
 import { get4ChanBoards, get4ChanCatalog, getThreads, FourChanBoard } from './services/api';
-import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, LayoutGrid, List, ArrowDownWideNarrow, ArrowUpNarrowWide, Star } from 'lucide-react';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { RefreshCw, LayoutGrid, List, ArrowDownWideNarrow, ArrowUpNarrowWide, Star, HardDrive, Download, ArrowLeft } from 'lucide-react';
 import { useScrollDirection } from './hooks/useScrollDirection';
 import { useMedia } from './context/MediaContext';
 import { useFeed } from './context/FeedContext';
@@ -47,7 +47,7 @@ export default function Home() {
   const observerTarget = useRef<HTMLDivElement>(null);
   const scrollDirection = useScrollDirection();
   const { fullscreenItem } = useMedia();
-  const { activeThreadId, closeThread, hiddenThreads, isBoardPickerOpen, openBoardPicker, closeBoardPicker } = useFeed();
+  const { activeThreadId, closeThread, hiddenThreads, isBoardPickerOpen, openBoardPicker, closeBoardPicker, isSavedMode, toggleSavedMode, savedThreads, refreshSavedThreads, activeThreadSave, deleteSavedThread } = useFeed();
 
   const getThreadKey = (t: Thread) => {
     return source === '2ch' ? `2ch:${t.num}` : `4chan:${activeBoard}:${t.num}`;
@@ -57,7 +57,7 @@ export default function Home() {
     return source === '2ch' ? t.num.toString() : `4chan:${activeBoard}:${t.num}`;
   };
 
-  const currentBoardLabel = source === '2ch' ? '/b/' : `/${activeBoard}/`;
+  const currentBoardLabel = isSavedMode ? 'Сохранённые' : (source === '2ch' ? '/b/' : `/${activeBoard}/`);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -258,13 +258,14 @@ export default function Home() {
   };
 
   useEffect(() => {
+    if (isSavedMode) return;
     fetchThreads();
-  }, [source, activeBoard]);
+  }, [source, activeBoard, isSavedMode]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-  }, [source, activeBoard]);
+  }, [source, activeBoard, isSavedMode]);
 
   useEffect(() => {
     if (source !== '4chan') return;
@@ -313,27 +314,51 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-white flex justify-center font-sans selection:bg-orange-500 selection:text-white">
-      <header className={`fixed top-0 left-1/2 -translate-x-1/2 w-full ${viewMode === 'catalog' ? 'max-w-5xl' : 'max-w-[600px]'} z-50 bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50 transition-transform duration-300 ease-in-out ${scrollDirection === 'down' || fullscreenItem ? '-translate-y-full' : 'translate-y-0'}`}>
+      <header className={`fixed top-0 left-1/2 -translate-x-1/2 w-full ${viewMode === 'catalog' ? 'max-w-5xl' : 'max-w-[600px]'} z-50 bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50 transition-transform duration-300 ease-in-out ${isSavedMode ? '-translate-y-full' : (scrollDirection === 'down' || fullscreenItem ? '-translate-y-full' : 'translate-y-0')}`}>
          <div className="flex items-center gap-2 min-w-0">
            <button
              onClick={() => {
+               if (isSavedMode) return;
                setSource(prev => prev === '2ch' ? '4chan' : '2ch');
                setError(null);
              }}
-             className={`font-bold tracking-tighter ${source === '4chan' ? 'text-green-400' : 'text-orange-500'} text-xl`}
+             className={`font-bold tracking-tighter ${source === '4chan' ? 'text-green-400' : 'text-orange-500'} text-xl ${isSavedMode ? 'opacity-50' : ''}`}
+             title={isSavedMode ? 'Недоступно в режиме сохранённых' : undefined}
            >
              {source === '2ch' ? '2ch' : '4chan'}
            </button>
 
            <button
-             onClick={openBoardPicker}
-             className="text-xl font-bold tracking-tighter text-white hover:text-gray-200 transition-colors truncate"
-             title="Выбрать доску"
+             onClick={() => {
+               if (isSavedMode) return;
+               openBoardPicker();
+             }}
+             className={`text-xl font-bold tracking-tighter text-white hover:text-gray-200 transition-colors truncate ${isSavedMode ? 'opacity-50' : ''}`}
+             title={isSavedMode ? 'Сохранённые треды' : 'Выбрать доску'}
            >
              {currentBoardLabel}
            </button>
          </div>
          <div className="flex items-center gap-2">
+             {activeThreadId && !activeThreadId.startsWith('local:') ? (
+               <button
+                 onClick={() => activeThreadSave?.()}
+                 className="p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200"
+                 title="Скачать тред"
+                 disabled={!activeThreadSave}
+               >
+                 <Download size={20} />
+               </button>
+             ) : (
+               <button
+                 onClick={toggleSavedMode}
+                 className={`p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200 ${isSavedMode ? 'text-cyan-300' : ''}`}
+                 title={isSavedMode ? 'Выйти из сохранённых' : 'Сохранённые треды'}
+               >
+                 <HardDrive size={20} />
+               </button>
+             )}
+             {isSavedMode ? null : (
              <button
                onClick={() => setViewMode(prev => prev === 'feed' ? 'catalog' : 'feed')}
                className="p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200"
@@ -341,6 +366,8 @@ export default function Home() {
              >
                {viewMode === 'feed' ? <LayoutGrid size={20} /> : <List size={20} />}
              </button>
+             )}
+             {isSavedMode ? null : (
              <button
                onClick={() => setSortMode(prev => prev === 'default' ? 'date_desc' : 'default')}
                className="p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200"
@@ -348,16 +375,18 @@ export default function Home() {
              >
                {sortMode === 'default' ? <ArrowDownWideNarrow size={20} /> : <ArrowUpNarrowWide size={20} />}
              </button>
+             )}
              <button 
-               onClick={fetchThreads}
+               onClick={isSavedMode ? refreshSavedThreads : fetchThreads}
                className="p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200"
-               title="Обновить"
+               title={isSavedMode ? 'Обновить список сохранённых' : 'Обновить'}
              >
-               <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+               <RefreshCw size={20} className={!isSavedMode && loading ? "animate-spin" : ""} />
              </button>
          </div>
       </header>
       <motion.div 
+        layout
         animate={{ 
           filter: activeThreadId ? 'blur(10px) brightness(0.7)' : 'blur(0px) brightness(1)',
           scale: activeThreadId ? 0.95 : 1
@@ -367,40 +396,56 @@ export default function Home() {
       >
 
          <div className={`pb-20 ${viewMode === 'catalog' ? 'p-2' : ''}`}>
-            {error && (
-              <div className="flex flex-col items-center justify-center py-20 text-center text-gray-400">
-                <p className="mb-4 text-lg">{error}</p>
-                <button 
-                  onClick={fetchThreads}
-                  className="px-6 py-2 bg-orange-600 text-white rounded-full hover:bg-orange-700 transition-colors"
-                >
-                  Попробовать снова
-                </button>
-              </div>
-            )}
+           {error && (
+             <div className="flex flex-col items-center justify-center py-20 text-center text-gray-400">
+               <p className="mb-4 text-lg">{error}</p>
+               <button 
+                 onClick={fetchThreads}
+                 className="px-6 py-2 bg-orange-600 text-white rounded-full hover:bg-orange-700 transition-colors"
+               >
+                 Попробовать снова
+               </button>
+             </div>
+           )}
 
-            {!error && viewMode === 'feed' ? (
-                <div className="flex flex-col">
-                    {visibleThreads.map(thread => (
-                      <PostCard 
-                        key={getThreadKey(thread)} 
-                        thread={thread} 
-                        openThreadId={getOpenThreadId(thread)}
-                        threadKey={getThreadKey(thread)}
-                      />
-                    ))}
-                </div>
-            ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                    {visibleThreads.map(thread => (
-                        <CatalogCard 
-                            key={getThreadKey(thread)} 
-                            thread={thread}
-                            openThreadId={getOpenThreadId(thread)}
-                        />
-                    ))}
-                </div>
-            )}
+           {!error && (
+             <LayoutGroup>
+               <motion.div
+                 layout
+                 transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+                 className={viewMode === 'feed' ? 'flex flex-col' : 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2'}
+               >
+                 {visibleThreads.map((thread) => {
+                   const key = getThreadKey(thread);
+                   return (
+                     <motion.div
+                       key={key}
+                       layout
+                       transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+                       className={viewMode === 'feed' ? '' : 'h-full'}
+                     >
+                       {viewMode === 'feed' ? (
+                         <PostCard
+                           thread={thread}
+                           openThreadId={getOpenThreadId(thread)}
+                           threadKey={key}
+                           truncateText={true}
+                           maxTextChars={400}
+                           animateIn={false}
+                         />
+                       ) : (
+                         <CatalogCard
+                           thread={thread}
+                           openThreadId={getOpenThreadId(thread)}
+                           animateIn={false}
+                         />
+                       )}
+                     </motion.div>
+                   );
+                 })}
+               </motion.div>
+             </LayoutGroup>
+           )}
             
             {loading && threads.length === 0 && (
               <div className="p-8 text-center text-gray-500 animate-pulse">
@@ -422,6 +467,72 @@ export default function Home() {
             threadId={activeThreadId} 
             onClose={closeThread} 
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {!isSavedMode ? null : (
+          <motion.div
+            className="fixed inset-0 z-[35] bg-black flex justify-center"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+          >
+            <div className="w-full max-w-[600px] border-x border-gray-900 h-full relative flex flex-col bg-black text-white font-sans">
+              <header className="absolute top-0 left-0 w-full z-50 bg-black/80 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center shadow-lg shadow-black/50">
+                <button
+                  onClick={toggleSavedMode}
+                  className="p-2 hover:bg-gray-800 rounded-full transition-colors"
+                  title="Назад"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <h2 className="text-lg font-bold tracking-tighter text-white truncate px-4 flex-1 text-center">
+                  Сохранённые
+                </h2>
+                <button
+                  onClick={refreshSavedThreads}
+                  className="p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200"
+                  title="Обновить"
+                >
+                  <RefreshCw size={20} />
+                </button>
+              </header>
+
+              <div className="flex-1 overflow-y-auto pt-16 pb-20">
+                {savedThreads.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">
+                    Нет сохранённых тредов
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    {savedThreads.map((item) => {
+                      const sizeMb = item.sizeBytes > 0 ? (item.sizeBytes / 1024 / 1024).toFixed(1) : '0.0';
+                      return (
+                        <div key={item.key} className="relative">
+                          <div className="absolute top-3 right-3 z-10 bg-black/70 backdrop-blur-sm border border-gray-800 text-white/80 text-[10px] font-mono px-2 py-1 rounded-full">
+                            {sizeMb} MB
+                          </div>
+                          <PostCard
+                            thread={item.thread}
+                            openThreadId={`local:${item.key}`}
+                            threadKey={item.key}
+                            enableHide={false}
+                            onThreadNumberClick={async () => {
+                              const ok = confirm(`Удалить сохранённый тред #${item.id}?\nБудут удалены медиа и данные треда.`);
+                              if (!ok) return;
+                              await deleteSavedThread(item.key);
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

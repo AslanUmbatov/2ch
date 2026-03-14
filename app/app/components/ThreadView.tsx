@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { Thread, File } from '../types';
 import { get4ChanThread, getThread } from '../services/api';
 import PostCard from './PostCard';
-import { ArrowLeft, MessageSquare, RefreshCw } from 'lucide-react';
+import { ArrowLeft, MessageSquare, RefreshCw, Download, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMedia, FullscreenItem } from '../context/MediaContext';
 import { disableBodyScroll, enableBodyScroll, clearAllBodyScrollLocks } from 'body-scroll-lock';
 import { useFeed } from '../context/FeedContext';
+import { estimateThreadSizeBytes, loadSavedThread, saveThreadLocally, SavedThreadPost } from '../services/offline';
+import { Capacitor } from '@capacitor/core';
 
 interface ThreadViewProps {
   threadId: string;
@@ -17,17 +19,31 @@ interface ThreadViewProps {
 
 export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
   const [thread, setThread] = useState<Thread | null>(null);
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<SavedThreadPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState({ done: 0, total: 0, percent: 0, label: '' });
   const { fullscreenItem, openFullscreen } = useMedia();
-  const { repliesOverlay, openRepliesOverlay, closeRepliesOverlay } = useFeed();
+  const { repliesOverlay, openRepliesOverlay, closeRepliesOverlay, refreshSavedThreads, setActiveThreadSave } = useFeed();
   const [scrollDirection, setScrollDirection] = useState<'up' | 'down'>('up');
   const lastScrollY = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  const isLocal = threadId.startsWith('local:');
+  const localKey = isLocal ? threadId.slice('local:'.length) : '';
+
   const fetchThread = async () => {
     setLoading(true);
     try {
+      if (isLocal) {
+        const data = await loadSavedThread(localKey);
+        if (data) {
+          setThread(data.thread);
+          setPosts(data.posts);
+        }
+        return;
+      }
+
       const parsed = threadId.startsWith('4chan:')
         ? { source: '4chan' as const, board: threadId.split(':')[1] || 'b', id: threadId.split(':')[2] || '' }
         : { source: '2ch' as const, id: threadId };
@@ -38,7 +54,7 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
 
       if (data) {
         setThread(data.thread);
-        setPosts(data.posts);
+        setPosts(data.posts as SavedThreadPost[]);
       }
     } catch (err) {
       console.error(err);
@@ -50,6 +66,63 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
   useEffect(() => {
     fetchThread();
   }, [threadId]);
+
+  const handleSaveThread = useCallback(async () => {
+    if (isLocal) return;
+    if (!Capacitor.isNativePlatform()) {
+      alert('Локальное сохранение доступно только на устройстве (Android/iOS).');
+      return;
+    }
+    if (isSaving || loading) return;
+    if (!thread || posts.length === 0) return;
+
+    const source = threadId.startsWith('4chan:') ? ('4chan' as const) : ('2ch' as const);
+    const board = source === '4chan' ? threadId.split(':')[1] || 'b' : undefined;
+    const id = source === '4chan' ? threadId.split(':')[2] || '' : threadId;
+    const key = source === '4chan' ? `4chan:${board}:${id}` : `2ch:${id}`;
+
+    const sizeBytes = estimateThreadSizeBytes(posts);
+    const sizeMb = sizeBytes > 0 ? (sizeBytes / 1024 / 1024).toFixed(1) : null;
+    const ok = confirm(
+      sizeMb
+        ? `Сохранить тред локально?\nВес: ~${sizeMb} МБ\nБудут скачаны все медиа.\nПродолжить?`
+        : 'Сохранить тред локально?\nБудут скачаны все медиа.\nПродолжить?'
+    );
+    if (!ok) return;
+
+    setIsSaving(true);
+    setSaveProgress({ done: 0, total: 0, percent: 0, label: '' });
+
+    try {
+      const clonedThread = JSON.parse(JSON.stringify(thread)) as Thread;
+      const clonedPosts = JSON.parse(JSON.stringify(posts)) as SavedThreadPost[];
+
+      await saveThreadLocally({
+        key,
+        source,
+        board,
+        id,
+        thread: clonedThread,
+        posts: clonedPosts,
+        onProgress: (p) => {
+          setSaveProgress({ done: p.done, total: p.total, percent: p.percent, label: p.label });
+        }
+      });
+
+      refreshSavedThreads();
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isLocal, isSaving, loading, thread, posts, threadId, refreshSavedThreads]);
+
+  useEffect(() => {
+    if (isLocal) {
+      setActiveThreadSave(null);
+      return;
+    }
+    setActiveThreadSave(() => handleSaveThread);
+    return () => setActiveThreadSave(null);
+  }, [handleSaveThread, isLocal, setActiveThreadSave]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -79,7 +152,7 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
   }, []);
 
   const repliesByTarget = useMemo(() => {
-    const map = new Map<string, any[]>();
+    const map = new Map<string, SavedThreadPost[]>();
 
     const getText = (htmlOrText: string) => {
       try {
@@ -120,12 +193,12 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
     return repliesByTarget.get(repliesOverlay.postNum) || [];
   }, [repliesByTarget, repliesOverlay, threadId]);
 
-  const mapPostToThread = (post: any): Thread => ({
+  const mapPostToThread = (post: SavedThreadPost): Thread => ({
     num: post.num,
-    comment: post.comment,
-    subject: post.subject,
-    timestamp: post.timestamp,
-    files: post.files,
+    comment: String(post.comment || ''),
+    subject: String(post.subject || ''),
+    timestamp: Number(post.timestamp || 0),
+    files: (post.files || []) as File[],
     posts_count: 0, 
     views: 0,
   });
@@ -139,13 +212,19 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
     return many;
   };
 
-  const handleMediaClick = (file: File, postNum: number) => {
+  const handleMediaClick = (file: File, postNum: string | number) => {
+    const resolveSrc = (value: string) => {
+      if (value.startsWith('http')) return value;
+      if (/^[a-zA-Z]+:/.test(value)) return value;
+      return `https://2ch.life${value}`;
+    };
+
     // Collect all media items from all posts in the thread
     const playlist: FullscreenItem[] = posts.flatMap(post => 
       (post.files || []).map((f: File) => ({
         type: (f.path.endsWith('.webm') || f.path.endsWith('.mp4')) ? 'video' : 'image',
-        src: f.path.startsWith('http') ? f.path : `https://2ch.life${f.path}`,
-        poster: f.thumbnail.startsWith('http') ? f.thumbnail : `https://2ch.life${f.thumbnail}`,
+        src: resolveSrc(f.path),
+        poster: resolveSrc(f.thumbnail),
         alt: f.displayname,
         layoutId: `media-${post.num}-${f.path}`,
         currentTime: 0
@@ -161,6 +240,7 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
   };
 
   const fallbackTitle = (() => {
+    if (isLocal) return thread?.subject || 'Сохранённый тред';
     if (!threadId.startsWith('4chan:')) return `Тред #${threadId}`;
     const parts = threadId.split(':');
     const board = parts[1] || 'b';
@@ -188,13 +268,50 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
             <h1 className="text-lg font-bold tracking-tighter text-white truncate px-4 flex-1 text-center">
               {thread?.subject || fallbackTitle}
             </h1>
-            <button 
-              onClick={fetchThread}
-              className="p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200"
-            >
-              <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-            </button>
+            <div className="flex items-center gap-1">
+              {isLocal ? null : (
+                <button
+                  onClick={handleSaveThread}
+                  className="p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200 disabled:opacity-50"
+                  title="Сохранить локально"
+                  disabled={isSaving || loading}
+                >
+                  {isSaving ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+                </button>
+              )}
+              <button 
+                onClick={isLocal ? onClose : fetchThread}
+                className="p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200"
+                title={isLocal ? 'Закрыть' : 'Обновить'}
+              >
+                <RefreshCw size={20} className={!isLocal && loading ? "animate-spin" : ""} />
+              </button>
+            </div>
           </header>
+
+          <AnimatePresence>
+            {!isSaving ? null : (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute top-14 left-0 right-0 z-50 px-4"
+              >
+                <div className="bg-black/70 backdrop-blur-md border border-gray-800 rounded-xl px-3 py-2">
+                  <div className="flex items-center justify-between text-xs text-white/80 font-mono">
+                    <span className="truncate pr-3">{saveProgress.label}</span>
+                    <span>{saveProgress.percent}%</span>
+                  </div>
+                  <div className="mt-2 h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-cyan-400"
+                      style={{ width: `${Math.min(100, Math.max(0, saveProgress.percent))}%` }}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div 
             ref={scrollContainerRef}

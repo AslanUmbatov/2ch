@@ -10,14 +10,14 @@ export default function BackButtonHandler() {
   const router = useRouter();
   const pathname = usePathname();
   const { fullscreenItem, closeFullscreen, isVideoLandscape, exitVideoLandscape } = useMedia();
-  const { activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay } = useFeed();
+  const { activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay, isSavedMode, toggleSavedMode } = useFeed();
 
   // Use refs to keep latest state accessible in the event listener without re-binding
-  const stateRef = useRef({ fullscreenItem, closeFullscreen, isVideoLandscape, exitVideoLandscape, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay });
+  const stateRef = useRef({ fullscreenItem, closeFullscreen, isVideoLandscape, exitVideoLandscape, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay, isSavedMode, toggleSavedMode });
 
   useEffect(() => {
-    stateRef.current = { fullscreenItem, closeFullscreen, isVideoLandscape, exitVideoLandscape, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay };
-  }, [fullscreenItem, closeFullscreen, isVideoLandscape, exitVideoLandscape, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay]);
+    stateRef.current = { fullscreenItem, closeFullscreen, isVideoLandscape, exitVideoLandscape, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay, isSavedMode, toggleSavedMode };
+  }, [fullscreenItem, closeFullscreen, isVideoLandscape, exitVideoLandscape, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay, isSavedMode, toggleSavedMode]);
 
   useEffect(() => {
     let listenerHandle: any;
@@ -26,7 +26,7 @@ export default function BackButtonHandler() {
     const setupListener = async () => {
       try {
         const handle = await App.addListener('backButton', ({ canGoBack }) => {
-            const { fullscreenItem, closeFullscreen, isVideoLandscape, exitVideoLandscape, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay } = stateRef.current;
+            const { fullscreenItem, closeFullscreen, isVideoLandscape, exitVideoLandscape, pathname, router, activeThreadId, closeThread, isBoardPickerOpen, closeBoardPicker, repliesOverlay, closeRepliesOverlay, isSavedMode, toggleSavedMode } = stateRef.current;
             
             if (fullscreenItem) {
                 if (fullscreenItem.type === 'video' && isVideoLandscape) {
@@ -41,6 +41,8 @@ export default function BackButtonHandler() {
             } else if (activeThreadId) {
                 // If thread overlay is open, close it
                 closeThread();
+            } else if (isSavedMode) {
+                toggleSavedMode();
             } else {
                 if (pathname === '/') {
                     // If on home page, minimize app (standard Android behavior)

@@ -8,9 +8,11 @@ import { useFeed } from '../context/FeedContext';
 interface CatalogCardProps {
   thread: Thread;
   openThreadId?: string;
+  layoutId?: string;
+  animateIn?: boolean;
 }
 
-export default function CatalogCard({ thread, openThreadId }: CatalogCardProps) {
+export default function CatalogCard({ thread, openThreadId, layoutId, animateIn = true }: CatalogCardProps) {
   const { openThread } = useFeed();
   const file = thread.files && thread.files.length > 0 ? thread.files[0] : null;
   const getMediaUrl = (path: string) => {
@@ -32,7 +34,8 @@ export default function CatalogCard({ thread, openThreadId }: CatalogCardProps) 
   return (
     <div onClick={() => openThread(openThreadId || thread.num.toString())} className="block h-full cursor-pointer">
       <motion.div  
-        initial={{ opacity: 0, scale: 0.95 }}
+        layoutId={layoutId}
+        initial={animateIn ? { opacity: 0, scale: 0.95 } : false}
         animate={{ opacity: 1, scale: 1 }}
         className="bg-gray-900 rounded-lg overflow-hidden hover:ring-1 hover:ring-orange-500 transition-all h-full flex flex-col relative group"
       >

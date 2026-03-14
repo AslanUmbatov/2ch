@@ -1,11 +1,17 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import type { SavedThreadMeta } from '../services/offline';
+import { deleteSavedThread as deleteSavedThreadImpl, listSavedThreads } from '../services/offline';
 
 interface FeedContextType {
   activeThreadId: string | null;
   openThread: (threadId: string) => void;
   closeThread: () => void;
+  openSavedThread: (key: string) => void;
+  activeThreadSave: (() => void) | null;
+  setActiveThreadSave: (fn: (() => void) | null) => void;
+  deleteSavedThread: (key: string) => Promise<void>;
   hiddenThreads: string[];
   hideThread: (threadId: string) => void;
   isBoardPickerOpen: boolean;
@@ -14,6 +20,10 @@ interface FeedContextType {
   repliesOverlay: { threadId: string; postNum: string } | null;
   openRepliesOverlay: (threadId: string, postNum: string | number) => void;
   closeRepliesOverlay: () => void;
+  isSavedMode: boolean;
+  toggleSavedMode: () => void;
+  savedThreads: SavedThreadMeta[];
+  refreshSavedThreads: () => void;
 }
 
 const FeedContext = createContext<FeedContextType | undefined>(undefined);
@@ -22,6 +32,9 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [isBoardPickerOpen, setIsBoardPickerOpen] = useState(false);
   const [repliesOverlay, setRepliesOverlay] = useState<{ threadId: string; postNum: string } | null>(null);
+  const [isSavedMode, setIsSavedMode] = useState(false);
+  const [savedThreads, setSavedThreads] = useState<SavedThreadMeta[]>(() => listSavedThreads());
+  const [activeThreadSave, setActiveThreadSave] = useState<(() => void) | null>(null);
   const [hiddenThreads, setHiddenThreads] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -48,8 +61,37 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     setActiveThreadId(null);
     setRepliesOverlay(null);
     // Restore body scroll
-    document.body.style.overflow = '';
+    if (!isSavedMode) document.body.style.overflow = '';
   };
+
+  const refreshSavedThreads = useCallback(() => {
+    setSavedThreads(listSavedThreads());
+  }, []);
+
+  const toggleSavedMode = useCallback(() => {
+    setIsSavedMode((prev) => {
+      const next = !prev;
+      if (next) {
+        refreshSavedThreads();
+        setIsBoardPickerOpen(false);
+        setRepliesOverlay(null);
+        setActiveThreadId(null);
+        document.body.style.overflow = 'hidden';
+      } else {
+        if (!activeThreadId) document.body.style.overflow = '';
+      }
+      return next;
+    });
+  }, [activeThreadId, refreshSavedThreads]);
+
+  const openSavedThread = (key: string) => {
+    openThread(`local:${key}`);
+  };
+
+  const deleteSavedThread = useCallback(async (key: string) => {
+    await deleteSavedThreadImpl(key);
+    setSavedThreads(listSavedThreads());
+  }, []);
 
   const openBoardPicker = () => setIsBoardPickerOpen(true);
   const closeBoardPicker = () => setIsBoardPickerOpen(false);
@@ -72,7 +114,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <FeedContext.Provider value={{ activeThreadId, openThread, closeThread, hiddenThreads, hideThread, isBoardPickerOpen, openBoardPicker, closeBoardPicker, repliesOverlay, openRepliesOverlay, closeRepliesOverlay }}>
+    <FeedContext.Provider value={{ activeThreadId, openThread, closeThread, openSavedThread, activeThreadSave, setActiveThreadSave, deleteSavedThread, hiddenThreads, hideThread, isBoardPickerOpen, openBoardPicker, closeBoardPicker, repliesOverlay, openRepliesOverlay, closeRepliesOverlay, isSavedMode, toggleSavedMode, savedThreads, refreshSavedThreads }}>
       {children}
     </FeedContext.Provider>
   );

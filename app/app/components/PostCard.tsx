@@ -9,12 +9,17 @@ import { useFeed } from '../context/FeedContext';
 interface PostCardProps {
   thread: Thread;
   onMediaClick?: (file: File) => void; // Made optional as we handle it internally now
+  onThreadNumberClick?: () => void;
   hideFooter?: boolean;
   openThreadId?: string;
   threadKey?: string;
   enableHide?: boolean;
   hideDivider?: boolean;
   compact?: boolean;
+  truncateText?: boolean;
+  maxTextChars?: number;
+  layoutId?: string;
+  animateIn?: boolean;
 }
 
 const getMediaUrl = (path: string) => {
@@ -81,7 +86,7 @@ const VideoThumbnail = ({ file, className, layoutId }: { file: File, className: 
   );
 };
 
-export default function PostCard({ thread, onMediaClick, hideFooter = false, openThreadId, threadKey, enableHide = true, hideDivider = false, compact = false }: PostCardProps) {
+export default function PostCard({ thread, onMediaClick, onThreadNumberClick, hideFooter = false, openThreadId, threadKey, enableHide = true, hideDivider = false, compact = false, truncateText = false, maxTextChars = 400, layoutId, animateIn = true }: PostCardProps) {
   const files = thread.files || [];
   const { openFullscreen, activeLayoutId } = useMedia();
   const { openThread, hideThread } = useFeed();
@@ -119,9 +124,27 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false, ope
       });
     };
 
+  const htmlToPlainText = (html: string) => {
+    const withBreaks = html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|tr)>/gi, '\n')
+      .replace(/<[^>]*>/g, '');
+    if (typeof document === 'undefined') return withBreaks;
+    const el = document.createElement('textarea');
+    el.innerHTML = withBreaks;
+    return el.value;
+  };
+
+  const plainComment = truncateText ? htmlToPlainText(thread.comment || '') : '';
+  const shouldTruncate = truncateText && plainComment.length > maxTextChars;
+  const previewText = truncateText
+    ? (shouldTruncate ? `${plainComment.slice(0, maxTextChars).trimEnd()}...` : plainComment)
+    : '';
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      layoutId={layoutId}
+      initial={animateIn ? { opacity: 0, y: 20 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className={`bg-black pb-6 ${compact ? 'mb-0' : 'mb-2'} ${hideDivider ? '' : 'border-b border-gray-800'}`}
@@ -130,18 +153,23 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false, ope
       <div className="px-4 py-3 flex justify-between items-center text-gray-500 text-xs">
         <div className="flex items-center gap-2">
           <span
-            className={`font-medium text-gray-400 ${enableHide ? 'hover:text-red-500 cursor-pointer transition-colors' : ''}`}
+            className={`font-medium text-gray-400 ${(enableHide || onThreadNumberClick) ? 'hover:text-red-500 cursor-pointer transition-colors' : ''}`}
             onClick={
-              enableHide
+              onThreadNumberClick
                 ? (e) => {
                     e.stopPropagation();
-                    if (confirm('Скрыть этот тред навсегда?')) {
-                      hideThread(threadKey || thread.num.toString());
-                    }
+                    onThreadNumberClick();
                   }
-                : undefined
+                : enableHide
+                  ? (e) => {
+                      e.stopPropagation();
+                      if (confirm('Скрыть этот тред навсегда?')) {
+                        hideThread(threadKey || thread.num.toString());
+                      }
+                    }
+                  : undefined
             }
-            title={enableHide ? 'Скрыть тред' : undefined}
+            title={onThreadNumberClick ? 'Действие с тредом' : (enableHide ? 'Скрыть тред' : undefined)}
           >
             #{thread.num}
           </span>
@@ -194,10 +222,16 @@ export default function PostCard({ thread, onMediaClick, hideFooter = false, ope
             {thread.subject}
           </h3>
         )}
-        <div
-          className="text-gray-300 text-sm leading-relaxed break-words whitespace-pre-wrap [&>a]:text-blue-400 [&>span.spoiler]:bg-gray-800 [&>span.spoiler]:text-transparent [&>span.spoiler:hover]:text-white transition-colors"
-          dangerouslySetInnerHTML={{ __html: thread.comment }}
-        />
+        {truncateText ? (
+          <div className="text-gray-300 text-sm leading-relaxed break-words whitespace-pre-wrap">
+            {previewText}
+          </div>
+        ) : (
+          <div
+            className="text-gray-300 text-sm leading-relaxed break-words whitespace-pre-wrap [&>a]:text-blue-400 [&>span.spoiler]:bg-gray-800 [&>span.spoiler]:text-transparent [&>span.spoiler:hover]:text-white transition-colors"
+            dangerouslySetInnerHTML={{ __html: thread.comment }}
+          />
+        )}
       </div>
 
       {/* Footer */}
