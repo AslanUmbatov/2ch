@@ -24,6 +24,8 @@ interface FeedContextType {
   toggleSavedMode: () => void;
   savedThreads: SavedThreadMeta[];
   refreshSavedThreads: () => void;
+  isDataSaver: boolean;
+  toggleDataSaver: () => void;
 }
 
 const FeedContext = createContext<FeedContextType | undefined>(undefined);
@@ -35,6 +37,15 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const [isSavedMode, setIsSavedMode] = useState(false);
   const [savedThreads, setSavedThreads] = useState<SavedThreadMeta[]>(() => listSavedThreads());
   const [activeThreadSave, setActiveThreadSave] = useState<(() => void) | null>(null);
+  const [isDataSaver, setIsDataSaver] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = localStorage.getItem('dataSaverMode');
+      return raw === '1' || raw === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [hiddenThreads, setHiddenThreads] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -113,8 +124,18 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const toggleDataSaver = useCallback(() => {
+    setIsDataSaver((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('dataSaverMode', next ? '1' : '0');
+      } catch {}
+      return next;
+    });
+  }, []);
+
   return (
-    <FeedContext.Provider value={{ activeThreadId, openThread, closeThread, openSavedThread, activeThreadSave, setActiveThreadSave, deleteSavedThread, hiddenThreads, hideThread, isBoardPickerOpen, openBoardPicker, closeBoardPicker, repliesOverlay, openRepliesOverlay, closeRepliesOverlay, isSavedMode, toggleSavedMode, savedThreads, refreshSavedThreads }}>
+    <FeedContext.Provider value={{ activeThreadId, openThread, closeThread, openSavedThread, activeThreadSave, setActiveThreadSave, deleteSavedThread, hiddenThreads, hideThread, isBoardPickerOpen, openBoardPicker, closeBoardPicker, repliesOverlay, openRepliesOverlay, closeRepliesOverlay, isSavedMode, toggleSavedMode, savedThreads, refreshSavedThreads, isDataSaver, toggleDataSaver }}>
       {children}
     </FeedContext.Provider>
   );

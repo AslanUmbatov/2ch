@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import PostCard from './components/PostCard';
 import CatalogCard from './components/CatalogCard';
 import { Thread } from './types';
@@ -47,15 +47,28 @@ export default function Home() {
   const observerTarget = useRef<HTMLDivElement>(null);
   const scrollDirection = useScrollDirection();
   const { fullscreenItem } = useMedia();
-  const { activeThreadId, closeThread, hiddenThreads, isBoardPickerOpen, openBoardPicker, closeBoardPicker, isSavedMode, toggleSavedMode, savedThreads, refreshSavedThreads, activeThreadSave, deleteSavedThread } = useFeed();
+  const { activeThreadId, closeThread, hiddenThreads, isBoardPickerOpen, openBoardPicker, closeBoardPicker, isSavedMode, toggleSavedMode, savedThreads, refreshSavedThreads, activeThreadSave, deleteSavedThread, isDataSaver, toggleDataSaver } = useFeed();
+
+  const toggleViewMode = useCallback(() => {
+    setViewMode((prev) => {
+      const next: 'feed' | 'catalog' = prev === 'feed' ? 'catalog' : 'feed';
+      setPage((p) => {
+        const currentItemsPerPage = prev === 'catalog' ? 20 : 10;
+        const nextItemsPerPage = next === 'catalog' ? 20 : 10;
+        const visibleCount = p * currentItemsPerPage;
+        return Math.max(1, Math.ceil(visibleCount / nextItemsPerPage));
+      });
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const handler = () => {
-      setViewMode((prev) => (prev === 'feed' ? 'catalog' : 'feed'));
+      toggleViewMode();
     };
     window.addEventListener('app:toggleViewMode', handler);
     return () => window.removeEventListener('app:toggleViewMode', handler);
-  }, []);
+  }, [toggleViewMode]);
 
   const getThreadKey = (t: Thread) => {
     return source === '2ch' ? `2ch:${t.num}` : `4chan:${activeBoard}:${t.num}`;
@@ -368,11 +381,22 @@ export default function Home() {
              )}
              {isSavedMode ? null : (
              <button
-               onClick={() => setViewMode(prev => prev === 'feed' ? 'catalog' : 'feed')}
+              onClick={toggleViewMode}
                className="p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200"
                title={viewMode === 'feed' ? "Каталог" : "Лента"}
              >
                {viewMode === 'feed' ? <LayoutGrid size={20} /> : <List size={20} />}
+             </button>
+             )}
+             {isSavedMode ? null : (
+             <button
+               onClick={toggleDataSaver}
+               className={`p-2 hover:bg-gray-800 rounded-full transition-colors active:scale-90 transform duration-200 ${isDataSaver ? 'text-cyan-300' : ''}`}
+               title={isDataSaver ? 'Экономия трафика: включена' : 'Экономия трафика: выключена'}
+             >
+               <span className="text-[11px] font-extrabold tracking-tight">
+                 {isDataSaver ? 'ECO' : 'HD'}
+               </span>
              </button>
              )}
              {isSavedMode ? null : (

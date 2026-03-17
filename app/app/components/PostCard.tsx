@@ -89,7 +89,7 @@ const VideoThumbnail = ({ file, className, layoutId }: { file: File, className: 
 export default function PostCard({ thread, onMediaClick, onThreadNumberClick, hideFooter = false, openThreadId, threadKey, enableHide = true, hideDivider = false, compact = false, truncateText = false, maxTextChars = 400, layoutId, animateIn = true }: PostCardProps) {
   const files = thread.files || [];
   const { openFullscreen, activeLayoutId } = useMedia();
-  const { openThread, hideThread } = useFeed();
+  const { openThread, hideThread, isDataSaver } = useFeed();
   
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString('ru-RU', {
@@ -197,7 +197,7 @@ export default function PostCard({ thread, onMediaClick, onThreadNumberClick, hi
               ) : (
                 <motion.img
                   layoutId={`media-${thread.num}-${file.path}`}
-                  src={getMediaUrl(file.path)}
+                  src={isDataSaver ? getThumbnailUrl(file) : getMediaUrl(file.path)}
                   alt={file.displayname}
                   className={`w-full h-full bg-gray-900 cursor-zoom-in ${files.length > 1 ? 'object-cover aspect-square' : 'object-contain max-h-[600px]'}`}
                   onClick={() => handleImageClick(file)}
@@ -206,7 +206,7 @@ export default function PostCard({ thread, onMediaClick, onThreadNumberClick, hi
                   onDragStart={(e) => e.preventDefault()}
                   style={{ opacity: activeLayoutId === `media-${thread.num}-${file.path}` ? 0 : 1 }}
                   onError={(e) => {
-                     e.currentTarget.src = getThumbnailUrl(file);
+                     e.currentTarget.src = isDataSaver ? getMediaUrl(file.path) : getThumbnailUrl(file);
                   }}
                 />
               )}
