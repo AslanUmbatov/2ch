@@ -6,6 +6,24 @@ import { Capacitor } from '@capacitor/core';
 export function useMediaDownloader() {
   const [isDownloading, setIsDownloading] = useState(false);
 
+  const extractDataRelativePathFromCapacitorUrl = (url: string) => {
+    try {
+      const parsed = new URL(url);
+      const marker = '/_capacitor_file_';
+      const idx = parsed.pathname.indexOf(marker);
+      if (idx === -1) return null;
+      const after = decodeURIComponent(parsed.pathname.slice(idx + marker.length));
+      const filesMarker = '/files/';
+      const filesIdx = after.indexOf(filesMarker);
+      if (filesIdx === -1) return null;
+      const relative = after.slice(filesIdx + filesMarker.length);
+      if (!relative) return null;
+      return relative;
+    } catch {
+      return null;
+    }
+  };
+
   const handleDownload = async (url: string, filename?: string) => {
     if (isDownloading) return;
     setIsDownloading(true);
@@ -33,6 +51,26 @@ export function useMediaDownloader() {
         });
 
         try {
+            const dataRelativePath = extractDataRelativePathFromCapacitorUrl(url);
+            if (dataRelativePath) {
+              const data = await Filesystem.readFile({
+                path: dataRelativePath,
+                directory: Directory.Data
+              });
+
+              await Filesystem.writeFile({
+                path: finalFilename,
+                directory: Directory.Documents,
+                data: data.data as string
+              });
+
+              await Toast.show({
+                text: 'Файл сохранен в папку Документы',
+                duration: 'long'
+              });
+              return;
+            }
+
             // Download directly to public Documents directory
             // This avoids "Album" issues and is simpler
             const downloadResult = await Filesystem.downloadFile({

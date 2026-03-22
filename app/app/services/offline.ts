@@ -135,10 +135,84 @@ export const estimateThreadSizeBytes = (posts: SavedThreadPost[]) => {
 
 export async function loadSavedThread(key: string): Promise<{ meta: SavedThreadMeta; thread: Thread; posts: SavedThreadPost[] } | null> {
   if (!Capacitor.isNativePlatform()) return null;
-  const path = `${ROOT_DIR}/${safeFilename(key)}/manifest.json`;
+  const sanitized = safeFilename(key);
+  const folder = `${ROOT_DIR}/${sanitized}`;
+  const path = `${folder}/manifest.json`;
   try {
     const res = await Filesystem.readFile({ path, directory: Directory.Data, encoding: Encoding.UTF8 });
     const manifest = JSON.parse(res.data as string) as SavedThreadManifest;
+    const needsMigration = (manifest.posts || []).some((p) =>
+      ((p?.files || []) as ThreadFile[]).some((f) => {
+        const v1 = typeof f?.path === 'string' ? f.path : '';
+        const v2 = typeof f?.thumbnail === 'string' ? f.thumbnail : '';
+        const isRelative = (v: string) => v.length > 0 && !v.startsWith('http') && !/^[a-zA-Z]+:/.test(v);
+        return isRelative(v1) || isRelative(v2);
+      })
+    );
+
+    if (needsMigration) {
+      try {
+        const mediaFolder = `${folder}/media`;
+        const list = await Filesystem.readdir({ path: mediaFolder, directory: Directory.Data });
+        const names = (list as unknown as { files?: string[] })?.files || [];
+
+        const byBase = new Map<string, { src?: string; thumb?: string; ts?: number }>();
+        for (const name of names) {
+          if (typeof name !== 'string' || name.length === 0) continue;
+          const justName = name.split('/').pop() || name;
+          const isThumb = justName.includes('_thumb');
+          const extStripped = justName.replace(/\.[^/.]+$/, '');
+          const base = isThumb ? extStripped.replace(/_thumb$/, '') : extStripped;
+          const entry = byBase.get(base) || {};
+          const tsMatch = base.match(/_(\d+)$/);
+          const ts = tsMatch ? Number(tsMatch[1]) : undefined;
+          if (typeof ts === 'number' && Number.isFinite(ts)) entry.ts = ts;
+          const rel = `${mediaFolder}/${justName}`;
+          if (isThumb) entry.thumb = rel;
+          else entry.src = rel;
+          byBase.set(base, entry);
+        }
+
+        const ordered = [...byBase.entries()]
+          .map(([base, v]) => ({ base, ...v }))
+          .filter((v) => typeof v.src === 'string' && v.src.length > 0)
+          .sort((a, b) => {
+            const at = typeof a.ts === 'number' ? a.ts : Number.POSITIVE_INFINITY;
+            const bt = typeof b.ts === 'number' ? b.ts : Number.POSITIVE_INFINITY;
+            if (at !== bt) return at - bt;
+            return a.base.localeCompare(b.base);
+          });
+
+        let idx = 0;
+        for (const post of manifest.posts || []) {
+          const files = (post?.files || []) as ThreadFile[];
+          for (const f of files) {
+            if (idx >= ordered.length) break;
+            const v = ordered[idx];
+            const isRelative = (value: string) => value.length > 0 && !value.startsWith('http') && !/^[a-zA-Z]+:/.test(value);
+            const currentPath = typeof f.path === 'string' ? f.path : '';
+            const currentThumb = typeof f.thumbnail === 'string' ? f.thumbnail : '';
+            if (!isRelative(currentPath) && !isRelative(currentThumb)) {
+              idx += 1;
+              continue;
+            }
+
+            if (v.src) {
+              const uri = await Filesystem.getUri({ path: v.src, directory: Directory.Data });
+              f.path = Capacitor.convertFileSrc(uri.uri);
+            }
+            if (v.thumb) {
+              const uri = await Filesystem.getUri({ path: v.thumb, directory: Directory.Data });
+              f.thumbnail = Capacitor.convertFileSrc(uri.uri);
+            }
+
+            idx += 1;
+          }
+          if (idx >= ordered.length) break;
+        }
+      } catch {}
+    }
+
     return { meta: manifest.meta, thread: manifest.thread, posts: manifest.posts };
   } catch {
     return null;
