@@ -8,7 +8,7 @@
 
 | Обзор ленты  | Режим каталог | Выбор досок  |
 | :---: | :---: | :---: |
-| ![Video 1](https://sun9-67.vkuserphoto.ru/s/v1/ig2/Dy6iNdUSYMN463vXihVjMK9upKvVp_CMSa5NujbQVlvd8AdcDVnkfb3OazgnQvodTW7-LRILf2y-DO_nQ4EE2Hrr.jpg?quality=95&as=32x69,48x104,72x156,108x234,160x347,240x520,360x780,480x1040,540x1170,591x1280&from=bu&cs=591x0) | ![Video 2](https://disk.yandex.ru/client/recent?idApp=client&dialog=slider&idDialog=%2Fdisk%2Fphoto_2026-03-23_01-07-58.jpg) | ![Boards Selection](https://sun9-39.vkuserphoto.ru/s/v1/ig2/VdBB6TuRnJ6cMul1z1m7i1mbccjH9qKmdqIXfzRYTXrlMHHHSmVrj6SUBtDBbSI6FWAW2QYVnk7YJHXJFqKVf3Rx.jpg?quality=95&as=32x69,48x104,72x156,108x234,160x347,240x520,360x780,480x1040,540x1170,591x1280&from=bu&cs=591x0) |
+| ![Video 1](https://sun9-67.vkuserphoto.ru/s/v1/ig2/Dy6iNdUSYMN463vXihVjMK9upKvVp_CMSa5NujbQVlvd8AdcDVnkfb3OazgnQvodTW7-LRILf2y-DO_nQ4EE2Hrr.jpg?quality=95&as=32x69,48x104,72x156,108x234,160x347,240x520,360x780,480x1040,540x1170,591x1280&from=bu&cs=591x0) | ![Video 2](https://sun9-38.vkuserphoto.ru/s/v1/ig2/Kl5nGBfmTbVt-mbMfiRmp_LGgnL74x1LxFZZRTIPCUDxqAW0SEHYkHzfN-dN6Wmq15vs0fX8pQ5j3gcYd7WcaQnV.jpg?quality=95&as=32x69,48x104,72x156,108x234,160x347,240x520,360x780,480x1040,540x1170,591x1280&from=bu&u=NYO2caQzmhnaG5he4vpWDyN8idIAXRVY2v10J-MxIKI&cs=591x0) | ![Boards Selection](https://sun9-39.vkuserphoto.ru/s/v1/ig2/VdBB6TuRnJ6cMul1z1m7i1mbccjH9qKmdqIXfzRYTXrlMHHHSmVrj6SUBtDBbSI6FWAW2QYVnk7YJHXJFqKVf3Rx.jpg?quality=95&as=32x69,48x104,72x156,108x234,160x347,240x520,360x780,480x1040,540x1170,591x1280&from=bu&cs=591x0) |
 
 ---
 
